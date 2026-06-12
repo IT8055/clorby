@@ -54,7 +54,7 @@ npm run package
 ```
 
 - On Windows this produces an NSIS installer, `Clorby-Setup-<version>.exe`, under `release/`. Double click it to install. It is not code signed, so Windows SmartScreen shows a warning the first time: click "More info" then "Run anyway". To share the app, send that one .exe.
-- On Linux this produces an AppImage and a .deb under `release/`. Install the .deb with `sudo dpkg -i Clorby-*.deb`, or make the AppImage executable (`chmod +x`) and run it. Build on the Linux machine itself (electron-builder cannot cross build Linux targets from Windows), which also pulls in the Linux build of the bundled engine.
+- On Linux this produces an AppImage and a .deb under `release/`. Install the .deb with `sudo dpkg -i Clorby-*.deb`, or make the AppImage executable (`chmod +x`) and run it. Build on the Linux machine itself (electron-builder cannot cross build Linux targets from Windows), which also pulls in the Linux build of the bundled engine. For step by step Linux build instructions (Mint), see README-LINUX.md.
 
 Notes:
 
