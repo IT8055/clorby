@@ -19,6 +19,12 @@ files:
   - '!electron.vite.config.ts'
   - '!tsconfig.json'
   - '!.gitignore'
+  # Never bundle build artifacts that may be sitting in the project folder.
+  - '!Clorby-*.exe'
+  - '!Clorby-*.AppImage'
+  - '!Clorby-*.deb'
+  - '!*.blockmap'
+  - '!release/**'
 
 win:
   target:
