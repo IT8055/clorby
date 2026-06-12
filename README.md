@@ -43,6 +43,8 @@ Built in phases (see SPEC.md for the full design, CLAUDE.md for conventions). It
 
 ## Installing and sharing
 
+For a plain installation guide to give to people you share the app with, see INSTALL.md. The rest of this section is about building the installers.
+
 Clorby can be packaged into a normal installer with electron-builder. There are no native modules to rebuild (the Whisper model is WebAssembly), so packaging is clean.
 
 Build an installer for the machine you are on:
