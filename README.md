@@ -2,13 +2,13 @@
 
 An always-on-top animated desktop companion for Windows. Clorby is a small yellow orb whose eyes follow your mouse, blinks, bobs, pulls expressions, and has a light personality: now and then it yawns, smiles, or nods off for a nap until you move the mouse. Click it to open a chat panel powered by Claude.
 
-This repository is being built in phases. The current phase is phase 2: the brain, a streaming chat panel that runs on your Claude subscription. See SPEC.md for the full design and CLAUDE.md for working conventions.
+Built in phases (see SPEC.md for the full design, CLAUDE.md for conventions). It now has the Claude powered chat, screen snip and ask, local voice in and out, conversation history, and a permission gated code review mode, and it can be packaged into installers (see Installing below).
 
 ## Prerequisites
 
-- Windows 11.
-- Node.js 20 LTS or newer.
-- Claude Code installed and logged in with your Claude subscription. The chat needs it. The SDK usually finds it even if `claude` is not on your PATH; if it cannot, set claudeExecutablePath in settings.json. Run `npm run doctor` to confirm.
+- Windows 11 (or a Linux desktop, see Installing).
+- For development: Node.js 20 LTS or newer.
+- A Claude subscription, logged in on the machine. Clorby rides your Claude Code login. The engine (the claude binary) is bundled with the SDK, so you do not need to install Claude Code just to run Clorby, but the machine must be logged in. The easiest way is to install Claude Code (claude.com/code) and run `claude` once; Clorby shares that login. Run `npm run doctor` to confirm.
 - ANTHROPIC_API_KEY must not be set in your environment. If it is, usage bills the API rather than your plan. Clorby scrubs it from the chat and shows a warning banner, but it is best removed entirely.
 
 ## Quickstart
@@ -40,6 +40,25 @@ This repository is being built in phases. The current phase is phase 2: the brai
    ```
    npm run build
    ```
+
+## Installing and sharing
+
+Clorby can be packaged into a normal installer with electron-builder. There are no native modules to rebuild (the Whisper model is WebAssembly), so packaging is clean.
+
+Build an installer for the machine you are on:
+
+```
+npm run package
+```
+
+- On Windows this produces an NSIS installer, `Clorby-Setup-<version>.exe`, under `release/`. Double click it to install. It is not code signed, so Windows SmartScreen shows a warning the first time: click "More info" then "Run anyway". To share the app, send that one .exe.
+- On Linux this produces an AppImage and a .deb under `release/`. Install the .deb with `sudo dpkg -i Clorby-*.deb`, or make the AppImage executable (`chmod +x`) and run it. Build on the Linux machine itself (electron-builder cannot cross build Linux targets from Windows), which also pulls in the Linux build of the bundled engine.
+
+Notes:
+
+- On every machine you still need to be logged in to your Claude subscription (see Prerequisites). The installer ships Clorby and the engine, not your login.
+- OneDrive caveat: building inside a OneDrive synced folder can fail with an EPERM rename error because OneDrive locks files. Either pause OneDrive while packaging, or send the output elsewhere, for example `npx electron-builder -c.directories.output=%LOCALAPPDATA%\clorby-build`.
+- Linux desktop note: use an X11 session (Mint Cinnamon is X11 by default). The transparent always-on-top orb, global hotkeys, and the screen snip are unreliable under Wayland.
 
 ## Using Clorby
 

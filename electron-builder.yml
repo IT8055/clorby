@@ -1,0 +1,49 @@
+appId: eu.walker-jones.clorby
+productName: Clorby
+copyright: Walker-Jones
+
+directories:
+  output: release
+  buildResources: build
+
+# asar is disabled on purpose: the Agent SDK is loaded via a dynamic ESM import
+# and the local Whisper model loads a wasm asset, both of which are simplest and
+# most reliable as loose files rather than packed inside an archive.
+asar: false
+
+files:
+  - '!src/**'
+  - '!scripts/**'
+  - '!build/**'
+  - '!*.md'
+  - '!electron.vite.config.ts'
+  - '!tsconfig.json'
+  - '!.gitignore'
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: ${productName}-Setup-${version}.${ext}
+
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Utility
+  icon: build/icon.png
+  synopsis: An animated desktop companion powered by Claude
+  maintainer: Walker-Jones <gerald.vegas@outlook.com>
+
+appImage:
+  artifactName: ${productName}-${version}.${ext}
+
+deb:
+  artifactName: ${productName}-${version}.${ext}

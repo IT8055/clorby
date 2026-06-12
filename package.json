@@ -1,8 +1,9 @@
 {
   "name": "clorby",
+  "productName": "Clorby",
   "version": "0.1.0",
-  "description": "Clorby, an animated desktop companion for Windows",
-  "author": "Walker-Jones",
+  "description": "Clorby, an animated desktop companion",
+  "author": "Walker-Jones <gerald.vegas@outlook.com>",
   "license": "UNLICENSED",
   "private": true,
   "main": "out/main/index.js",
@@ -11,7 +12,7 @@
     "build": "tsc -p tsconfig.json && electron-vite build",
     "typecheck": "tsc -p tsconfig.json",
     "doctor": "node scripts/doctor.mjs",
-    "package": "electron-builder"
+    "package": "npm run build && electron-builder"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.175"
@@ -22,6 +23,7 @@
     "@types/node": "^22.10.1",
     "dompurify": "^3.4.10",
     "electron": "^33.2.1",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^2.3.0",
     "markdown-it": "^14.2.0",
     "typescript": "^5.7.2",
