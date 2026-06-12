@@ -3,6 +3,14 @@ out/
 dist/
 release/
 *.log
+
+# Built installers (too large for git; rebuild with npm run package)
+*.exe
+*.AppImage
+*.deb
+*.dmg
+*.snap
+*.blockmap
 .DS_Store
 Thumbs.db
 .vite/
