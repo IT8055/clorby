@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'" />
+    <title>Clorby</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 200px;
+        height: 200px;
+        background: transparent;
+        overflow: hidden;
+        cursor: default;
+        user-select: none;
+      }
+      canvas {
+        display: block;
+        width: 200px;
+        height: 200px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="orb" width="200" height="200"></canvas>
+    <script type="module" src="./orb.ts"></script>
+  </body>
+</html>

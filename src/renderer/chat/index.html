@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https: data: blob:" />
+    <title>Clorby</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100vh;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        font-size: 13px;
+        color: #20201c;
+        background: #fbf8ef;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        position: relative;
+      }
+      .overlay {
+        display: none;
+        position: absolute;
+        top: 34px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #fbf8ef;
+        z-index: 5;
+        flex-direction: column;
+      }
+      .overlaybar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-bottom: 1px solid #e7dfc6;
+        background: #f3eedd;
+      }
+      .overlaybar .name {
+        font-weight: 600;
+      }
+      .titlebar {
+        height: 34px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 4px 0 12px;
+        background: #f3eedd;
+        border-bottom: 1px solid #e7dfc6;
+        app-region: drag;
+        -webkit-app-region: drag;
+        user-select: none;
+      }
+      .titlebar .name {
+        font-weight: 600;
+        letter-spacing: 0.2px;
+      }
+      .titlebar .actions {
+        display: flex;
+        gap: 2px;
+        app-region: no-drag;
+        -webkit-app-region: no-drag;
+      }
+      .winbtn {
+        width: 30px;
+        height: 26px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        border-radius: 6px;
+        background: transparent;
+        color: #6b6655;
+        cursor: pointer;
+        padding: 0;
+      }
+      .winbtn:hover {
+        background: #e7dfc6;
+      }
+      .winbtn.close:hover {
+        background: #e0584a;
+        color: #fff;
+      }
+      .winbtn svg {
+        width: 15px;
+        height: 15px;
+      }
+      .winbtn.window svg {
+        width: 11px;
+        height: 11px;
+      }
+      .banner {
+        display: none;
+        padding: 8px 12px;
+        background: #fde7e2;
+        color: #8a2b16;
+        border-bottom: 1px solid #f3c9bf;
+        font-size: 12px;
+      }
+      .transcript {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .hint {
+        margin: auto;
+        text-align: center;
+        color: #9a937e;
+        max-width: 260px;
+        line-height: 1.5;
+      }
+      .msg {
+        display: flex;
+        flex-direction: column;
+        max-width: 86%;
+      }
+      .msg.user {
+        align-self: flex-end;
+        align-items: flex-end;
+      }
+      .msg.assistant {
+        align-self: flex-start;
+      }
+      .bubble {
+        padding: 8px 11px;
+        border-radius: 12px;
+        line-height: 1.5;
+        word-wrap: break-word;
+        overflow-wrap: anywhere;
+      }
+      .msg.user .bubble {
+        background: #ffe8a8;
+        border-bottom-right-radius: 4px;
+      }
+      .msg.assistant .bubble {
+        background: #ffffff;
+        border: 1px solid #ece3c9;
+        border-bottom-left-radius: 4px;
+      }
+      .msg.error .bubble {
+        background: #fde7e2;
+        border: 1px solid #f3c9bf;
+        color: #8a2b16;
+      }
+      .bubble p:first-child {
+        margin-top: 0;
+      }
+      .bubble p:last-child {
+        margin-bottom: 0;
+      }
+      .bubble pre {
+        background: #2b2b33;
+        color: #f4f1e6;
+        padding: 8px 10px;
+        border-radius: 8px;
+        overflow-x: auto;
+      }
+      .bubble code {
+        font-family: 'Cascadia Code', 'Consolas', monospace;
+        font-size: 12px;
+      }
+      .bubble :not(pre) > code {
+        background: #f0ead6;
+        padding: 1px 4px;
+        border-radius: 4px;
+      }
+      .bubble a {
+        color: #b67900;
+      }
+      .bubble img.snap {
+        display: block;
+        max-width: 100%;
+        border-radius: 8px;
+        margin-bottom: 6px;
+      }
+      .bubble .attachname {
+        font-size: 12px;
+        color: #6b6655;
+        font-style: italic;
+        margin-bottom: 4px;
+      }
+      .meta {
+        margin-top: 3px;
+        font-size: 11px;
+        color: #aaa28b;
+      }
+      .typing span {
+        display: inline-block;
+        width: 5px;
+        height: 5px;
+        margin-right: 3px;
+        border-radius: 50%;
+        background: #c9bf9e;
+        animation: blink 1.2s infinite ease-in-out;
+      }
+      .typing span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .typing span:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+      @keyframes blink {
+        0%,
+        80%,
+        100% {
+          opacity: 0.3;
+        }
+        40% {
+          opacity: 1;
+        }
+      }
+      .historylist {
+        flex: 1;
+        overflow-y: auto;
+        padding: 6px;
+      }
+      .historyitem {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 8px;
+        padding: 4px 4px 4px 10px;
+      }
+      .historyitem:hover {
+        background: #f0ead6;
+      }
+      .historyitem .open {
+        flex: 1;
+        min-width: 0;
+        text-align: left;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        color: #20201c;
+        padding: 5px 0;
+      }
+      .historyitem .title {
+        font-size: 13px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .historyitem .date {
+        font-size: 11px;
+        color: #aaa28b;
+        margin-top: 2px;
+      }
+      .historyitem .del {
+        flex: 0 0 auto;
+        border: none;
+        background: transparent;
+        color: #b59b86;
+        cursor: pointer;
+        border-radius: 6px;
+        width: 28px;
+        height: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .historyitem .del:hover {
+        background: #fde7e2;
+        color: #8a2b16;
+      }
+      .historyempty {
+        padding: 20px;
+        text-align: center;
+        color: #9a937e;
+      }
+      .settingsbody {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .field > .label {
+        font-size: 12px;
+        color: #6b6655;
+        font-weight: 600;
+      }
+      .field select {
+        box-sizing: border-box;
+        width: 100%;
+        font-size: 13px;
+        padding: 6px;
+        border: 1px solid #ddd3b4;
+        border-radius: 6px;
+        background: #fffdf6;
+        color: #20201c;
+      }
+      .field.row {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .field .speedrow {
+        display: flex;
+        gap: 8px;
+      }
+      .field .speedrow select {
+        width: auto;
+      }
+      .field .speedrow #voiceselect {
+        flex: 1;
+        min-width: 0;
+      }
+      .field .speedrow .speed {
+        flex: 0 0 auto;
+      }
+      .toolline {
+        align-self: flex-start;
+        max-width: 92%;
+        font-size: 12px;
+        color: #7a7461;
+      }
+      .toolline .head {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+      }
+      .toolline .dot {
+        color: #b59b86;
+      }
+      pre.diff {
+        margin: 5px 0 0;
+        background: #2b2b33;
+        border-radius: 8px;
+        padding: 8px 10px;
+        overflow-x: auto;
+        font-family: 'Cascadia Code', 'Consolas', monospace;
+        font-size: 11.5px;
+        line-height: 1.45;
+        color: #d8d3c4;
+        white-space: pre;
+      }
+      pre.diff .add {
+        color: #a7e08a;
+      }
+      pre.diff .del {
+        color: #e58f86;
+      }
+      .permcard {
+        align-self: flex-start;
+        max-width: 92%;
+        background: #fff7e6;
+        border: 1px solid #f0d9a0;
+        border-radius: 10px;
+        padding: 10px;
+      }
+      .permcard .ptitle {
+        font-weight: 600;
+        margin-bottom: 2px;
+      }
+      .permcard .pbtns {
+        display: flex;
+        gap: 6px;
+        margin-top: 8px;
+        flex-wrap: wrap;
+      }
+      .permcard .pbtns button {
+        border: none;
+        border-radius: 6px;
+        padding: 5px 10px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .permcard .pbtns .allow {
+        background: #7aa34a;
+        color: #fff;
+      }
+      .permcard .pbtns .session {
+        background: #e0d8bf;
+        color: #20201c;
+      }
+      .permcard .pbtns .deny {
+        background: #e0584a;
+        color: #fff;
+      }
+      .permcard .outcome {
+        margin-top: 8px;
+        font-size: 12px;
+        color: #6b6655;
+      }
+      .projectbar {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 10px;
+        font-size: 12px;
+        background: #eef4e6;
+        border-top: 1px solid #d8e6c6;
+      }
+      .projectbar .pname {
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-weight: 600;
+        color: #3f5a26;
+      }
+      .projectbar .modes {
+        display: flex;
+        border: 1px solid #bcd39a;
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .projectbar .modes button {
+        border: none;
+        background: #f6faf0;
+        color: #3f5a26;
+        font-size: 11px;
+        padding: 3px 9px;
+        cursor: pointer;
+      }
+      .projectbar .modes button.active {
+        background: #7aa34a;
+        color: #fff;
+      }
+      .projectbar .exit {
+        border: none;
+        background: transparent;
+        color: #6b8a4a;
+        cursor: pointer;
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        font-size: 14px;
+      }
+      .projectbar .exit:hover {
+        background: #dceacb;
+      }
+      .field button.sbtn {
+        border: none;
+        border-radius: 6px;
+        background: #e0d8bf;
+        color: #5c5647;
+        height: 30px;
+        padding: 0 12px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .field button.sbtn:hover {
+        background: #d6cdae;
+      }
+      .field .pathnote {
+        font-weight: normal;
+        color: #9a937e;
+        font-size: 12px;
+      }
+      .snipchip {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        background: #f3eedd;
+        border-top: 1px solid #e7dfc6;
+      }
+      .snipchip img {
+        max-height: 44px;
+        max-width: 120px;
+        border-radius: 6px;
+        border: 1px solid #ddd3b4;
+      }
+      .snipchip .label {
+        flex: 1;
+        font-size: 12px;
+        color: #6b6655;
+      }
+      .snipchip button {
+        border: none;
+        background: #e0d8bf;
+        border-radius: 6px;
+        width: 22px;
+        height: 22px;
+        cursor: pointer;
+        color: #6b6655;
+      }
+      .composer {
+        padding: 8px;
+        border-top: 1px solid #e7dfc6;
+        background: #f3eedd;
+        display: flex;
+        gap: 5px;
+        align-items: flex-end;
+      }
+      .cbtn {
+        flex: 0 0 auto;
+        width: 34px;
+        height: 34px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        border-radius: 8px;
+        background: #e0d8bf;
+        color: #5c5647;
+        cursor: pointer;
+        padding: 0;
+      }
+      .cbtn:hover {
+        background: #d6cdae;
+      }
+      .cbtn svg {
+        width: 18px;
+        height: 18px;
+      }
+      .cbtn.talk {
+        width: auto;
+        min-width: 34px;
+        padding: 0 8px;
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+      }
+      .cbtn.talk.on {
+        background: #e0584a;
+        color: #fff;
+      }
+      .cbtn.talk:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+      .composer textarea {
+        flex: 1;
+        min-width: 0;
+        resize: none;
+        max-height: 120px;
+        box-sizing: border-box;
+        padding: 8px 10px;
+        border: 1px solid #ddd3b4;
+        border-radius: 8px;
+        font-family: inherit;
+        font-size: 13px;
+        background: #fffdf6;
+        color: #20201c;
+      }
+      .composer .send {
+        flex: 0 0 auto;
+        height: 34px;
+        padding: 0 14px;
+        border: none;
+        border-radius: 8px;
+        background: #f7b500;
+        color: #20201c;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .composer .send.stop {
+        background: #e0d8bf;
+      }
+      .footer {
+        padding: 4px 12px;
+        font-size: 11px;
+        color: #aaa28b;
+        background: #f3eedd;
+        border-top: 1px solid #ece3c9;
+        display: flex;
+        justify-content: space-between;
+        user-select: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="titlebar">
+      <span class="name">Clorby</span>
+      <div class="actions">
+        <button class="winbtn" id="settings" title="Settings" aria-label="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="8" x2="20" y2="8"/><circle cx="9" cy="8" r="2.4" fill="currentColor" stroke="none"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="15" cy="16" r="2.4" fill="currentColor" stroke="none"/></svg>
+        </button>
+        <button class="winbtn" id="history" title="Past chats" aria-label="Past chats">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        </button>
+        <button class="winbtn" id="new" title="New chat" aria-label="New chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <button class="winbtn window" id="min" title="Minimise" aria-label="Minimise">
+          <svg viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><line x1="2" y1="6.5" x2="10" y2="6.5"/></svg>
+        </button>
+        <button class="winbtn window close" id="close" title="Close" aria-label="Close">
+          <svg viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><line x1="2.6" y1="2.6" x2="9.4" y2="9.4"/><line x1="9.4" y1="2.6" x2="2.6" y2="9.4"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="banner" id="banner"></div>
+    <div class="transcript" id="transcript">
+      <div class="hint" id="hint">Ask me anything. I run on your Claude subscription.</div>
+    </div>
+    <div class="snipchip" id="snipchip">
+      <img id="snipthumb" alt="attachment" />
+      <span class="label" id="sniplabel">Attachment</span>
+      <button id="snipremove" title="Remove">&times;</button>
+    </div>
+    <div class="projectbar" id="projectbar">
+      <span class="pname" id="projectname"></span>
+      <div class="modes">
+        <button id="modereview">Review</button>
+        <button id="modeact">Act</button>
+      </div>
+      <button class="exit" id="projectexit" title="Leave project">&times;</button>
+    </div>
+    <div class="composer">
+      <button class="cbtn" id="snip" title="Screen clip" aria-label="Screen clip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M2 6h14a2 2 0 0 1 2 2v14"/></svg>
+      </button>
+      <button class="cbtn" id="attach" title="Attach a file" aria-label="Attach a file">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5l-8.5 8.5a5 5 0 0 1-7-7l9-9a3.3 3.3 0 0 1 4.7 4.7l-9 9a1.6 1.6 0 0 1-2.3-2.3l8.1-8.1"/></svg>
+      </button>
+      <button class="cbtn talk" id="mic" title="Hold to talk" aria-label="Hold to talk">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="21"/><line x1="8.5" y1="21" x2="15.5" y2="21"/></svg>
+      </button>
+      <textarea id="input" rows="1" placeholder="Message Clorby"></textarea>
+      <button id="send" class="send">Send</button>
+      <button id="stop" class="send stop" style="display: none">Stop</button>
+    </div>
+    <div class="footer">
+      <span id="model"></span>
+      <span id="apikey"></span>
+    </div>
+
+    <div class="overlay" id="historyview">
+      <div class="overlaybar">
+        <button class="winbtn" id="historyback" title="Back" aria-label="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <span class="name">Past chats</span>
+      </div>
+      <div class="historylist" id="historylist"></div>
+    </div>
+
+    <div class="overlay" id="settingsview">
+      <div class="overlaybar">
+        <button class="winbtn" id="settingsback" title="Back" aria-label="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <span class="name">Settings</span>
+      </div>
+      <div class="settingsbody">
+        <div class="field">
+          <span class="label">Project (for code review)</span>
+          <div class="speedrow">
+            <button class="sbtn" id="chooseproject">Choose folder</button>
+            <button class="sbtn" id="clearproject">Use general chat</button>
+          </div>
+          <span class="pathnote" id="projectpath">No project: general chat.</span>
+        </div>
+        <div class="field row">
+          <span class="label">Allow terminal commands (Bash) in Act mode</span>
+          <input type="checkbox" id="bashtoggle" />
+        </div>
+        <div class="field">
+          <span class="label">Model</span>
+          <select id="modelselect">
+            <option value="default">Default (best available)</option>
+            <option value="claude-opus-4-8">Opus 4.8 (most capable)</option>
+            <option value="claude-sonnet-4-6">Sonnet 4.6 (balanced)</option>
+            <option value="claude-haiku-4-5-20251001">Haiku 4.5 (fastest, leanest)</option>
+          </select>
+        </div>
+        <div class="field row">
+          <span class="label">Read replies aloud</span>
+          <input type="checkbox" id="voicetoggle" />
+        </div>
+        <div class="field">
+          <span class="label">Voice</span>
+          <div class="speedrow">
+            <select id="voiceselect"></select>
+            <select id="speedselect" class="speed">
+              <option value="0.9">Slow</option>
+              <option value="1">Normal</option>
+              <option value="1.15">Brisk</option>
+              <option value="1.3">Fast</option>
+              <option value="1.5">Faster</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <span class="label">Microphone</span>
+          <select id="micselect"></select>
+        </div>
+        <div class="field row">
+          <span class="label">OLED safe mode (drift to avoid burn-in)</span>
+          <input type="checkbox" id="oledtoggle" />
+        </div>
+      </div>
+    </div>
+    <script type="module" src="./chat.ts"></script>
+  </body>
+</html>
