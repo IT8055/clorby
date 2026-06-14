@@ -50,6 +50,21 @@ const modeReview = el<HTMLButtonElement>('modereview')
 const modeAct = el<HTMLButtonElement>('modeact')
 const micButton = el<HTMLButtonElement>('mic')
 const MIC_ICON = micButton.innerHTML
+const memorybar = el<HTMLDivElement>('memorybar')
+const memToggle = el<HTMLButtonElement>('memtoggle')
+const memText = el<HTMLTextAreaElement>('memtext')
+const memSave = el<HTMLButtonElement>('memsave')
+const memOpen = el<HTMLButtonElement>('memopen')
+const memDot = el<HTMLSpanElement>('memdot')
+const memCount = el<HTMLSpanElement>('memcount')
+const themeSelect = el<HTMLSelectElement>('themeselect')
+const orbSizeSelect = el<HTMLSelectElement>('orbsizeselect')
+const autostartToggle = el<HTMLInputElement>('autostarttoggle')
+const hkChat = el<HTMLInputElement>('hkchat')
+const hkSnip = el<HTMLInputElement>('hksnip')
+const hkSave = el<HTMLButtonElement>('hksave')
+const hkNote = el<HTMLSpanElement>('hknote')
+const retentionSelect = el<HTMLSelectElement>('retentionselect')
 
 const recorder = new VoiceRecorder()
 let selectedMic = localStorage.getItem('clorby.mic') ?? ''
@@ -131,6 +146,33 @@ micSelect.addEventListener('change', () => {
 modelSelect.addEventListener('change', () => bridge.setModel(modelSelect.value))
 oledToggle.addEventListener('change', () => bridge.setOledSafe(oledToggle.checked))
 bashToggle.addEventListener('change', () => bridge.setAllowBash(bashToggle.checked))
+
+function applyTheme(theme: string): void {
+  document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light')
+}
+
+themeSelect.addEventListener('change', () => {
+  const theme = themeSelect.value === 'dark' ? 'dark' : 'light'
+  applyTheme(theme)
+  bridge.setTheme(theme)
+})
+orbSizeSelect.addEventListener('change', () => bridge.setOrbSize(Number(orbSizeSelect.value)))
+autostartToggle.addEventListener('change', () => bridge.setAutostart(autostartToggle.checked))
+retentionSelect.addEventListener('change', () => bridge.setRetention(Number(retentionSelect.value)))
+hkSave.addEventListener('click', () => {
+  hkNote.classList.remove('bad')
+  hkNote.textContent = 'Saving...'
+  bridge.setHotkeys(hkChat.value.trim(), hkSnip.value.trim())
+})
+bridge.onHotkeysResult((result) => {
+  if (result.failed.length > 0) {
+    hkNote.classList.add('bad')
+    hkNote.textContent = `Already in use or invalid: ${result.failed.join(', ')}`
+  } else {
+    hkNote.classList.remove('bad')
+    hkNote.textContent = 'Shortcuts saved.'
+  }
+})
 el<HTMLButtonElement>('chooseproject').addEventListener('click', () => bridge.chooseProject())
 el<HTMLButtonElement>('clearproject').addEventListener('click', () => bridge.clearProject())
 modeReview.addEventListener('click', () => bridge.setMode('review'))
@@ -145,6 +187,14 @@ void populateMics()
 bridge.onSettings((settings: ChatSettings) => {
   modelSelect.value = settings.model
   oledToggle.checked = settings.oledSafe
+  themeSelect.value = settings.theme
+  applyTheme(settings.theme)
+  orbSizeSelect.value = String(settings.orbSize)
+  autostartToggle.checked = settings.autostart
+  retentionSelect.value = String(settings.retentionDays)
+  // Do not stomp a hotkey field the user is editing.
+  if (document.activeElement !== hkChat) hkChat.value = settings.toggleChatHotkey
+  if (document.activeElement !== hkSnip) hkSnip.value = settings.snipHotkey
 })
 
 // Voice output (local speech synthesis).
@@ -434,6 +484,56 @@ bridge.onProjectState((state: ProjectState) => {
     projectPath.textContent = 'No project: general chat.'
   }
 })
+
+// Memory panel: a collapsible editor for the notes Clorby keeps across chats.
+// The file on disk is the source of truth; this view reflects it and writes
+// back. Both the user and Clorby can change it.
+
+const MEMORY_MAX = 4000
+let memoryDirty = false
+
+function updateMemCount(): void {
+  const n = memText.value.length
+  memCount.textContent = `${n} / ${MEMORY_MAX}`
+  memCount.classList.toggle('over', n > MEMORY_MAX)
+}
+
+memToggle.addEventListener('click', () => {
+  const open = memorybar.classList.toggle('open')
+  memToggle.setAttribute('aria-expanded', open ? 'true' : 'false')
+  if (open) {
+    memDot.classList.remove('show')
+    memText.focus()
+  }
+})
+
+memText.addEventListener('input', () => {
+  memoryDirty = true
+  updateMemCount()
+})
+
+memSave.addEventListener('click', () => {
+  bridge.saveMemory(memText.value)
+  memoryDirty = false
+})
+
+memOpen.addEventListener('click', () => bridge.openMemoryFile())
+
+bridge.onMemory((content: string) => {
+  // Never clobber edits the user is in the middle of making.
+  if (memoryDirty && document.activeElement === memText) return
+  if (memText.value === content) return
+  const collapsed = !memorybar.classList.contains('open')
+  memText.value = content
+  memoryDirty = false
+  updateMemCount()
+  // If memory changed while the panel was collapsed, flag it so the change is
+  // visible without forcing the panel open.
+  if (collapsed) memDot.classList.add('show')
+})
+
+updateMemCount()
+bridge.requestMemory()
 
 bridge.onSnipAttached((snip: SnipResult) => {
   attachedThumb = snip.thumbnail

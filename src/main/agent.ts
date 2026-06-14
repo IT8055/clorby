@@ -3,6 +3,7 @@ import { existsSync, realpathSync } from 'fs'
 import { basename, dirname, relative, resolve, sep } from 'path'
 import { updateSettings } from './settings'
 import { snipsDir } from './snip'
+import { memoryForPrompt, memoryPath } from './memory'
 import type {
   ChatError,
   ChatInit,
@@ -141,6 +142,34 @@ const CLORBY_PERSONA = [
   'A light touch of warmth is welcome; sycophancy is not.'
 ].join(' ')
 
+// Memory tools are available on every turn so Clorby can keep notes. The guard
+// confines them to the memory file when no project is open. A project widens
+// the set (read tools in Review, write tools and Bash in Act).
+const MEMORY_TOOLS = ['Read', 'Write', 'Edit']
+
+// Fold the current memory into the persona, plus how to update it. Kept terse,
+// and the memory slice is already capped by memoryForPrompt.
+function composeSystemPrompt(memory: string): string {
+  const guide =
+    '\n\n## Your memory\n' +
+    `You keep notes across conversations in a Markdown file at ${memoryPath()}. ` +
+    'Gary can edit it and so can you. When he tells you something worth keeping, ' +
+    'such as a preference, a fact about him, or a decision, save it by writing that ' +
+    'file with the Write tool. Keep it short, one terse entry per line, and never store secrets.'
+  const body = memory.length === 0 ? '\nIt is currently empty.' : `\n\nCurrent memory:\n${memory}`
+  return `${CLORBY_PERSONA}${guide}${body}`
+}
+
+// A surfaced status line for a memory write, so a change is never silent.
+function memoryActivity(toolName: string, input: Record<string, unknown>): ToolActivity {
+  if (toolName === 'Edit') {
+    return { kind: 'write', summary: 'Updated its memory', detail: simpleDiff(str(input['old_string']), str(input['new_string'])) }
+  }
+  const content = str(input['content'])
+  const detail = content.length > 0 ? content.split('\n').map((l) => `+ ${l}`).join('\n') : null
+  return { kind: 'write', summary: 'Updated its memory', detail }
+}
+
 // Options.env replaces the subprocess environment wholesale, so spread the real
 // environment and strip the two variables that would silently bill an API key
 // instead of the subscription.
@@ -219,6 +248,7 @@ export interface AgentEvents {
   onError(error: ChatError): void
   onStatus(status: ChatStatus): void
   onToolActivity(activity: ToolActivity): void
+  onMemoryUpdated(): void
   requestPermission(request: {
     kind: ToolKind
     title: string
@@ -296,6 +326,11 @@ export class AgentService {
 
     const absOf = (value: string): string => resolve(base, value)
 
+    // Clorby's memory file: matched by absolute path, case folded on Windows.
+    const memFile = norm(memoryPath())
+    const isMemoryTarget = (input: Record<string, unknown>): boolean =>
+      norm(absOf(str(input['file_path']))) === memFile
+
     // The path to show on cards and status lines: project relative when inside
     // the project, otherwise the raw value, so nothing about the destination is
     // hidden behind a bare filename.
@@ -330,6 +365,18 @@ export class AgentService {
     }
 
     return async (toolName, input) => {
+      // Clorby's own memory: always readable and writable, outside any project
+      // and with no permission card, but every change is surfaced so it is
+      // never silent. Checked first so it is not gated by project confinement.
+      if ((toolName === 'Read' || WRITE_TOOLS.includes(toolName)) && isMemoryTarget(input)) {
+        if (WRITE_TOOLS.includes(toolName)) {
+          this.events.onToolActivity(memoryActivity(toolName, input))
+          this.events.onMemoryUpdated()
+        } else {
+          this.events.onToolActivity({ kind: 'read', summary: 'Read its memory', detail: null })
+        }
+        return allow(input)
+      }
       if (toolName === 'Read') {
         if (!isConfined(absOf(str(input['file_path'])), readRoots)) {
           return deny('Clorby may only read files in this project.')
@@ -434,7 +481,7 @@ export class AgentService {
     const options: Options = {
       resume: this.sessionId ?? undefined,
       cwd: this.sessionsDir(),
-      systemPrompt: CLORBY_PERSONA,
+      systemPrompt: composeSystemPrompt(memoryForPrompt()),
       tools: [],
       includePartialMessages: true,
       abortController: abort,
@@ -445,32 +492,36 @@ export class AgentService {
         : {})
     }
 
-    // Plain chat sends a string prompt with no tools. A project or an attachment
-    // needs tools, which means the permission guard, which only works in
-    // streaming input mode, so the prompt becomes a one message async iterable.
-    let promptInput: string | AsyncIterable<SDKUserMessage> = text
-    if (this.project || attachmentPath) {
-      if (this.project) {
-        options.tools = this.mode === 'act' ? [...READ_TOOLS, ...WRITE_TOOLS, 'Bash'] : READ_TOOLS
-      } else {
-        options.tools = ['Read']
+    // Every turn runs in streaming input mode with the permission guard, because
+    // Clorby can always read and update its memory file. The guard confines the
+    // memory tools to that one file; a project widens the toolset (read tools in
+    // Review, write tools and Bash in Act), and an attachment is read through the
+    // same Read tool. Streaming input is required for canUseTool's control channel.
+    const tools = new Set<string>(MEMORY_TOOLS)
+    if (this.project) {
+      for (const t of READ_TOOLS) tools.add(t)
+      if (this.mode === 'act') {
+        for (const t of WRITE_TOOLS) tools.add(t)
+        tools.add('Bash')
       }
-      options.canUseTool = this.buildGuard(attachmentPath, settings.review.allowBash)
-      const parts = [text]
-      if (this.project) {
-        parts.push(
-          `\n\nYou are reviewing the project at ${this.project}. ${
-            this.mode === 'act'
-              ? 'You may edit files, but each change needs the user to approve it.'
-              : 'This is read-only; do not attempt to change files.'
-          } Cite file paths and line numbers.`
-        )
-      }
-      if (attachmentPath) {
-        parts.push(`\n\nThe user attached a file at:\n${attachmentPath}\nUse the Read tool to open it, then answer about it.`)
-      }
-      promptInput = singleUserMessage(parts.join(''))
     }
+    options.tools = [...tools]
+    options.canUseTool = this.buildGuard(attachmentPath, settings.review.allowBash)
+
+    const parts = [text]
+    if (this.project) {
+      parts.push(
+        `\n\nYou are reviewing the project at ${this.project}. ${
+          this.mode === 'act'
+            ? 'You may edit files, but each change needs the user to approve it.'
+            : 'This is read-only; do not attempt to change files.'
+        } Cite file paths and line numbers.`
+      )
+    }
+    if (attachmentPath) {
+      parts.push(`\n\nThe user attached a file at:\n${attachmentPath}\nUse the Read tool to open it, then answer about it.`)
+    }
+    const promptInput: AsyncIterable<SDKUserMessage> = singleUserMessage(parts.join(''))
 
     try {
       const sdk = await loadSdk()

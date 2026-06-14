@@ -2,8 +2,6 @@ import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
 import type { Settings } from '../shared/types'
 
-const ORB_SIZE = 200
-
 let orbWindow: BrowserWindow | null = null
 let chatWindow: BrowserWindow | null = null
 
@@ -22,8 +20,8 @@ function loadPage(win: BrowserWindow, page: 'orb' | 'chat'): void {
 
 export function createOrbWindow(settings: Settings): BrowserWindow {
   const win = new BrowserWindow({
-    width: ORB_SIZE,
-    height: ORB_SIZE,
+    width: settings.orbSize,
+    height: settings.orbSize,
     x: settings.orb.x,
     y: settings.orb.y,
     transparent: true,

@@ -32,6 +32,8 @@ export const IPC = {
   chatToolActivity: 'chat:tool-activity',
   chatPermissionRequest: 'chat:permission-request',
   chatProjectState: 'chat:project-state',
+  chatMemory: 'chat:memory',
+  chatHotkeysResult: 'chat:hotkeys-result',
 
   // chat renderer to main
   chatRequestHide: 'chat:request-hide',
@@ -53,6 +55,14 @@ export const IPC = {
   chatRequestAttach: 'chat:request-attach',
   chatSetModel: 'chat:set-model',
   chatSetOled: 'chat:set-oled',
+  chatMemoryRequest: 'chat:memory-request',
+  chatMemorySave: 'chat:memory-save',
+  chatMemoryOpen: 'chat:memory-open',
+  chatSetOrbSize: 'chat:set-orb-size',
+  chatSetTheme: 'chat:set-theme',
+  chatSetAutostart: 'chat:set-autostart',
+  chatSetHotkeys: 'chat:set-hotkeys',
+  chatSetRetention: 'chat:set-retention',
 
   // snip overlay renderer to main
   snipSelect: 'snip:select',

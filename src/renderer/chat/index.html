@@ -461,6 +461,99 @@
         color: #9a937e;
         font-size: 12px;
       }
+      .memorybar {
+        border-bottom: 1px solid #e7dfc6;
+        background: #f7f3e6;
+        flex: 0 0 auto;
+      }
+      .memhead {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        border: none;
+        background: transparent;
+        color: #6b6655;
+        cursor: pointer;
+        font: inherit;
+      }
+      .memhead:hover {
+        background: #f0ead6;
+      }
+      .memhead .memchev {
+        width: 12px;
+        height: 12px;
+        transition: transform 0.15s ease;
+      }
+      .memorybar.open .memhead .memchev {
+        transform: rotate(90deg);
+      }
+      .memhead .memname {
+        font-weight: 600;
+      }
+      .memhead .memdot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #f7b500;
+        margin-left: 2px;
+        display: none;
+      }
+      .memhead .memdot.show {
+        display: inline-block;
+      }
+      .membody {
+        display: none;
+        flex-direction: column;
+        gap: 6px;
+        padding: 0 12px 10px;
+      }
+      .memorybar.open .membody {
+        display: flex;
+      }
+      .membody textarea {
+        box-sizing: border-box;
+        width: 100%;
+        min-height: 90px;
+        max-height: 200px;
+        resize: vertical;
+        padding: 8px 10px;
+        border: 1px solid #ddd3b4;
+        border-radius: 8px;
+        font-family: 'Cascadia Code', 'Consolas', monospace;
+        font-size: 12px;
+        background: #fffdf6;
+        color: #20201c;
+      }
+      .membody .memrow {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .membody .memspacer {
+        flex: 1;
+      }
+      .membody .memcount {
+        font-size: 11px;
+        color: #aaa28b;
+      }
+      .membody .memcount.over {
+        color: #b3402f;
+      }
+      .membody .memrow button {
+        border: none;
+        border-radius: 6px;
+        background: #e0d8bf;
+        color: #5c5647;
+        height: 28px;
+        padding: 0 12px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .membody .memrow button:hover {
+        background: #d6cdae;
+      }
       .snipchip {
         display: none;
         align-items: center;
@@ -571,6 +664,126 @@
         justify-content: space-between;
         user-select: none;
       }
+      /* Dark theme: overrides applied when the document carries */
+      /* data-theme="dark". The light rules above are left untouched. */
+      :root[data-theme='dark'],
+      :root[data-theme='dark'] body {
+        background: #1e1d1a;
+        color: #ece6d6;
+      }
+      :root[data-theme='dark'] .overlay {
+        background: #1e1d1a;
+      }
+      :root[data-theme='dark'] .titlebar,
+      :root[data-theme='dark'] .overlaybar,
+      :root[data-theme='dark'] .composer,
+      :root[data-theme='dark'] .footer,
+      :root[data-theme='dark'] .snipchip,
+      :root[data-theme='dark'] .memorybar {
+        background: #26241f;
+        border-color: #3a362d;
+      }
+      :root[data-theme='dark'] .footer {
+        color: #a59f8c;
+      }
+      :root[data-theme='dark'] .winbtn,
+      :root[data-theme='dark'] .memhead,
+      :root[data-theme='dark'] .toolline,
+      :root[data-theme='dark'] .toolline .dot,
+      :root[data-theme='dark'] .hint,
+      :root[data-theme='dark'] .meta,
+      :root[data-theme='dark'] .field > .label,
+      :root[data-theme='dark'] .field .pathnote,
+      :root[data-theme='dark'] .membody .memcount,
+      :root[data-theme='dark'] .snipchip .label,
+      :root[data-theme='dark'] .bubble .attachname,
+      :root[data-theme='dark'] .historyitem .date,
+      :root[data-theme='dark'] .historyitem .del,
+      :root[data-theme='dark'] .historyempty,
+      :root[data-theme='dark'] .permcard .outcome {
+        color: #a59f8c;
+      }
+      :root[data-theme='dark'] .winbtn:hover,
+      :root[data-theme='dark'] .memhead:hover,
+      :root[data-theme='dark'] .historyitem:hover {
+        background: #322f27;
+      }
+      :root[data-theme='dark'] .msg.assistant .bubble {
+        background: #2b2922;
+        border-color: #3a362d;
+      }
+      :root[data-theme='dark'] .msg.user .bubble {
+        background: #4a3f1e;
+      }
+      :root[data-theme='dark'] .bubble a {
+        color: #e0a93a;
+      }
+      :root[data-theme='dark'] .bubble :not(pre) > code {
+        background: #322f27;
+      }
+      :root[data-theme='dark'] .typing span {
+        background: #6b6655;
+      }
+      :root[data-theme='dark'] .historyitem .open {
+        color: #ece6d6;
+      }
+      :root[data-theme='dark'] .field select,
+      :root[data-theme='dark'] .composer textarea,
+      :root[data-theme='dark'] .membody textarea {
+        background: #201f1b;
+        border-color: #4a4538;
+        color: #ece6d6;
+      }
+      :root[data-theme='dark'] .cbtn,
+      :root[data-theme='dark'] .field button.sbtn,
+      :root[data-theme='dark'] .membody .memrow button,
+      :root[data-theme='dark'] .composer .send.stop,
+      :root[data-theme='dark'] .permcard .pbtns .session {
+        background: #3a362d;
+        color: #ece6d6;
+      }
+      :root[data-theme='dark'] .snipchip button {
+        background: #3a362d;
+        color: #a59f8c;
+      }
+      :root[data-theme='dark'] .cbtn:hover,
+      :root[data-theme='dark'] .field button.sbtn:hover,
+      :root[data-theme='dark'] .membody .memrow button:hover {
+        background: #463f33;
+      }
+      :root[data-theme='dark'] .permcard {
+        background: #322a16;
+        border-color: #5a4d24;
+      }
+      .hkrow {
+        display: flex;
+        gap: 8px;
+      }
+      .hkrow input {
+        flex: 1;
+        min-width: 0;
+        box-sizing: border-box;
+        font-size: 13px;
+        padding: 6px;
+        border: 1px solid #ddd3b4;
+        border-radius: 6px;
+        background: #fffdf6;
+        color: #20201c;
+      }
+      :root[data-theme='dark'] .hkrow input {
+        background: #201f1b;
+        border-color: #4a4538;
+        color: #ece6d6;
+      }
+      .hknote {
+        flex: 1;
+        font-size: 11px;
+        color: #aaa28b;
+        min-height: 14px;
+      }
+      .hknote.bad {
+        color: #b3402f;
+      }
     </style>
   </head>
   <body>
@@ -595,6 +808,22 @@
       </div>
     </div>
     <div class="banner" id="banner"></div>
+    <div class="memorybar" id="memorybar">
+      <button class="memhead" id="memtoggle" aria-expanded="false" title="Notes Clorby keeps across chats">
+        <svg class="memchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+        <span class="memname">Memory</span>
+        <span class="memdot" id="memdot" title="Updated"></span>
+      </button>
+      <div class="membody" id="membody">
+        <textarea id="memtext" placeholder="Notes Clorby keeps across chats. You and Clorby can both edit this. One short note per line."></textarea>
+        <div class="memrow">
+          <span class="memcount" id="memcount"></span>
+          <span class="memspacer"></span>
+          <button id="memopen">Open file</button>
+          <button id="memsave">Save</button>
+        </div>
+      </div>
+    </div>
     <div class="transcript" id="transcript">
       <div class="hint" id="hint">Ask me anything. I run on your Claude subscription.</div>
     </div>
@@ -669,6 +898,21 @@
             <option value="claude-haiku-4-5-20251001">Haiku 4.5 (fastest, leanest)</option>
           </select>
         </div>
+        <div class="field">
+          <span class="label">Theme</span>
+          <select id="themeselect">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </div>
+        <div class="field">
+          <span class="label">Orb size</span>
+          <select id="orbsizeselect">
+            <option value="150">Small</option>
+            <option value="200">Medium</option>
+            <option value="260">Large</option>
+          </select>
+        </div>
         <div class="field row">
           <span class="label">Read replies aloud</span>
           <input type="checkbox" id="voicetoggle" />
@@ -693,6 +937,31 @@
         <div class="field row">
           <span class="label">OLED safe mode (drift to avoid burn-in)</span>
           <input type="checkbox" id="oledtoggle" />
+        </div>
+        <div class="field row">
+          <span class="label">Start with Windows</span>
+          <input type="checkbox" id="autostarttoggle" />
+        </div>
+        <div class="field">
+          <span class="label">Shortcuts (restart not needed)</span>
+          <div class="hkrow">
+            <input id="hkchat" type="text" spellcheck="false" placeholder="Toggle chat" title="Toggle chat" />
+            <input id="hksnip" type="text" spellcheck="false" placeholder="Snip" title="Snip" />
+          </div>
+          <div class="hkrow">
+            <span class="hknote" id="hknote"></span>
+            <span class="memspacer"></span>
+            <button class="sbtn" id="hksave">Save shortcuts</button>
+          </div>
+        </div>
+        <div class="field">
+          <span class="label">Delete snips after</span>
+          <select id="retentionselect">
+            <option value="1">1 day</option>
+            <option value="7">7 days</option>
+            <option value="30">30 days</option>
+            <option value="90">90 days</option>
+          </select>
         </div>
       </div>
     </div>

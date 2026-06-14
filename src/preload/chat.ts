@@ -7,12 +7,14 @@ import type {
   ChatSettings,
   ChatStatus,
   HistoryLoaded,
+  HotkeysResult,
   PermissionDecision,
   PermissionRequest,
   ProjectState,
   ReviewMode,
   SessionSummary,
   SnipResult,
+  Theme,
   ToolActivity
 } from '../shared/types'
 
@@ -59,6 +61,18 @@ const bridge = {
   },
   onProjectState(callback: (state: ProjectState) => void): void {
     ipcRenderer.on(IPC.chatProjectState, (_event, state: ProjectState) => callback(state))
+  },
+  onMemory(callback: (content: string) => void): void {
+    ipcRenderer.on(IPC.chatMemory, (_event, content: string) => callback(content))
+  },
+  requestMemory(): void {
+    ipcRenderer.send(IPC.chatMemoryRequest)
+  },
+  saveMemory(content: string): void {
+    ipcRenderer.send(IPC.chatMemorySave, content)
+  },
+  openMemoryFile(): void {
+    ipcRenderer.send(IPC.chatMemoryOpen)
   },
   permissionResponse(id: string, decision: PermissionDecision): void {
     ipcRenderer.send(IPC.chatPermissionResponse, { id, decision })
@@ -107,6 +121,24 @@ const bridge = {
   },
   setOledSafe(enabled: boolean): void {
     ipcRenderer.send(IPC.chatSetOled, enabled)
+  },
+  setOrbSize(size: number): void {
+    ipcRenderer.send(IPC.chatSetOrbSize, size)
+  },
+  setTheme(theme: Theme): void {
+    ipcRenderer.send(IPC.chatSetTheme, theme)
+  },
+  setAutostart(enabled: boolean): void {
+    ipcRenderer.send(IPC.chatSetAutostart, enabled)
+  },
+  setHotkeys(toggleChat: string, snip: string): void {
+    ipcRenderer.send(IPC.chatSetHotkeys, { toggleChat, snip })
+  },
+  setRetention(days: number): void {
+    ipcRenderer.send(IPC.chatSetRetention, days)
+  },
+  onHotkeysResult(callback: (result: HotkeysResult) => void): void {
+    ipcRenderer.on(IPC.chatHotkeysResult, (_event, result: HotkeysResult) => callback(result))
   },
   send(text: string): void {
     ipcRenderer.send(IPC.chatSend, text)

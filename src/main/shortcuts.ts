@@ -25,8 +25,14 @@ export function registerShortcuts(
   const failed: string[] = []
 
   const tryRegister = (accelerator: string, callback: () => void): void => {
-    const ok = globalShortcut.register(accelerator, callback)
-    if (!ok) failed.push(accelerator)
+    // A malformed accelerator string throws rather than returning false, so
+    // catch it: a bad custom hotkey is reported, never a crash.
+    try {
+      const ok = globalShortcut.register(accelerator, callback)
+      if (!ok) failed.push(accelerator)
+    } catch {
+      failed.push(accelerator)
+    }
   }
 
   tryRegister(accelerators.toggleChat, handlers.toggleChat)

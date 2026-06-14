@@ -202,10 +202,14 @@ settings.json lives in app.getPath('userData'). Write atomically (write to a tem
 ```ts
 interface Settings {
   orb: { x: number; y: number }
+  orbSize: number                  // on-screen size, presets 150 / 200 / 260, default 200
   hotkeys: { toggleChat: string; snip: string }
   model: 'default' | string        // explicit model id to conserve credit, optional
   snip: { retentionDays: number }  // default 7
   review: { allowBash: boolean }   // default false
+  oledSafe: boolean                // drift the orb to avoid OLED burn-in, default false
+  theme: 'light' | 'dark'          // chat panel theme, default light
+  autostart: boolean               // launch with Windows, default false
   lastSessionId: string | null
   claudeExecutablePath: string | null  // override if claude is not on PATH
 }
@@ -346,10 +350,26 @@ Build: agent service per section 11, streaming chat UI with markdown, status-dri
 
 ### Phase 5: polish
 
-- [ ] Settings window: hotkeys, model, retention, allowBash, start with Windows
-- [ ] Autostart via app.setLoginItemSettings
-- [ ] Installer builds and installs cleanly; app icon and tray icon final
+- [x] Settings panel: model, theme, orb size, voice, mic, OLED, Bash, hotkeys, retention, start with Windows
+- [x] Autostart via app.setLoginItemSettings, reachable from Settings and the tray
+- [x] Configurable hotkeys: edit the toggle-chat and snip accelerators in Settings; re-registered live, with failures reported
+- [x] Snip retention chooser in Settings (1, 7, 30, or 90 days)
+- [x] Orb size presets (Small, Medium, Large) with eye tracking and off-screen recovery preserved
+- [x] Light and dark theme for the chat panel
+- [x] Orb right-click menu trimmed to global actions (Chat, Snip, Hide, Quit); chat actions and settings live in the chat window, not duplicated
+- [x] Installer builds and installs cleanly; app icon and tray icon final
 - [ ] Expression pass: transitions tuned, optional subtle sounds behind a setting
+
+### Phase 6: memory
+
+Build: cross-session memory per section 19. A collapsible Memory panel in the chat window, the memory file folded into the system prompt each turn, and a guarded write path so Clorby can update its own memory.
+
+- [ ] A collapsible Memory panel sits at the top of the chat window, always present; it shows the memory file, edits save to disk, and Open file reveals it
+- [ ] The memory file is injected into the system prompt each turn, so Clorby recalls it without a tool call
+- [ ] Clorby can update the memory file itself via the Write tool, confined to that one file, with no permission card, and each change shows as a quiet transcript line and refreshes the panel
+- [ ] Writes outside the memory file still require a project in Act mode and a permission card; reads stay confined as before
+- [ ] External edits and Clorby's writes refresh the panel, except when the user has unsaved edits focused
+- [ ] The memory slice is capped for the prompt; the panel shows the count and warns when over
 
 ## 17. Risks and mitigations
 
@@ -361,4 +381,16 @@ Build: agent service per section 11, streaming chat UI with markdown, status-dri
 
 ## 18. Parking lot
 
-Voice in and out. Watch mode (interval snapshots with a hard budget). MCP servers for home tooling. Reactions to system events such as a long build finishing. Alternative skins and personalities. A Linux build for the Mint laptop.
+Watch mode (interval snapshots with a hard budget). A video companion on a model that ingests video natively (Claude takes images and PDFs only, so a screen-recording feature would mean sending sampled frames; the value wants a different model, so this lives in a separate app rather than Clorby). MCP servers for home tooling. Reactions to system events such as a long build finishing. Alternative skins and personalities. A Linux build for the Mint laptop.
+
+## 19. Memory (phase 6)
+
+A single Markdown file, clorby-memory.md, in app.getPath('userData'), holds notes that persist across conversations. Both Gary and Clorby edit it; the file on disk is the single source of truth.
+
+Reading: the file, capped to a few KB, is folded into the system prompt on every turn, after the persona, so every chat carries it without a tool call. The cap keeps a long memory from bloating every request; the panel warns when over.
+
+Writing by Clorby: the memory tools (Read, Write, Edit) are enabled on every turn. The canUseTool guard permits them on the memory file only, outside any project, automatically (no permission card), and surfaces each change as a quiet "Updated its memory" line in the transcript. Every other write still obeys the review-mode rules: a project, Act mode, and a permission card. Reads stay confined to the project, the snips folder, and the attached file as before, plus the memory file.
+
+Editing by the user: a collapsible Memory panel sits at the top of the chat window, always present. Expanded, it shows an editable text area, a character count with an over-cap warning, Save, and Open file.
+
+Co-editing: the memory file is watched. Clorby's writes, the user's Save, and external editor edits all refresh the panel, except when the user has unsaved edits focused, so in-progress typing is never clobbered. Notes are kept short, one per line; secrets are never stored.

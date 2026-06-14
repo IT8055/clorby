@@ -10,9 +10,23 @@ declare global {
   }
 }
 
-const ORB_CENTRE_LOCAL = 100
-const ENTER_RADIUS = 70
-const EXIT_RADIUS = 74
+// The face geometry is authored in a fixed 200 unit space; the canvas is scaled
+// to fill whatever size the orb window is, so the orb can be resized without
+// touching the drawing code. Hit radii scale with the window too.
+const BASE = 200
+const ENTER_RATIO = 70 / BASE
+const EXIT_RATIO = 74 / BASE
+
+// The orb window is square, so the CSS width is also its height.
+function orbPixelSize(): number {
+  return window.innerWidth || BASE
+}
+function enterRadius(): number {
+  return ENTER_RATIO * orbPixelSize()
+}
+function exitRadius(): number {
+  return EXIT_RATIO * orbPixelSize()
+}
 
 const bridge = window.clorbyOrb
 const canvas = document.getElementById('orb') as HTMLCanvasElement
@@ -32,13 +46,17 @@ let running = false
 let inside = false
 let dragging = false
 
-function sizeCanvas(): void {
+// Keep the backing store matched to the window and device pixel ratio, and
+// return the transform scale that maps BASE units onto the window crisply.
+function sizeCanvas(): number {
   const dpr = window.devicePixelRatio || 1
-  const target = Math.round(200 * dpr)
+  const css = orbPixelSize()
+  const target = Math.round(css * dpr)
   if (canvas.width !== target) {
     canvas.width = target
     canvas.height = target
   }
+  return (css / BASE) * dpr
 }
 
 function frame(now: number): void {
@@ -47,10 +65,9 @@ function frame(now: number): void {
     return
   }
 
-  sizeCanvas()
-  const dpr = window.devicePixelRatio || 1
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  ctx.clearRect(0, 0, 200, 200)
+  const scale = sizeCanvas()
+  ctx.setTransform(scale, 0, 0, scale, 0, 0)
+  ctx.clearRect(0, 0, BASE, BASE)
 
   const baseIdle = expression === 'idle'
   const idleMs = now - lastActivity
@@ -104,25 +121,26 @@ bridge.onVisibility((next: boolean) => {
 })
 
 function hitTest(event: MouseEvent): number {
-  const dx = event.clientX - ORB_CENTRE_LOCAL
-  const dy = event.clientY - ORB_CENTRE_LOCAL
+  const half = orbPixelSize() / 2
+  const dx = event.clientX - half
+  const dy = event.clientY - half
   return Math.hypot(dx, dy)
 }
 
 window.addEventListener('pointermove', (event) => {
   markActive()
   const distance = hitTest(event)
-  if (!inside && distance <= ENTER_RADIUS) {
+  if (!inside && distance <= enterRadius()) {
     inside = true
     bridge.setIgnoreMouse(false)
-  } else if (inside && distance > EXIT_RADIUS && !dragging) {
+  } else if (inside && distance > exitRadius() && !dragging) {
     inside = false
     bridge.setIgnoreMouse(true)
   }
 })
 
 window.addEventListener('pointerdown', (event) => {
-  if (hitTest(event) > ENTER_RADIUS) return
+  if (hitTest(event) > enterRadius()) return
   markActive()
   dragging = true
   bridge.dragStart()
@@ -136,7 +154,7 @@ window.addEventListener('pointerup', () => {
 
 // Right-click anywhere on the orb opens the native context menu in main.
 window.addEventListener('contextmenu', (event) => {
-  if (hitTest(event) > ENTER_RADIUS) return
+  if (hitTest(event) > enterRadius()) return
   event.preventDefault()
   markActive()
   bridge.contextMenu()

@@ -2,7 +2,7 @@
 
 An always-on-top animated desktop companion for Windows. Clorby is a small yellow orb whose eyes follow your mouse, blinks, bobs, pulls expressions, and has a light personality: now and then it yawns, smiles, or nods off for a nap until you move the mouse. Click it to open a chat panel powered by Claude.
 
-Built in phases (see SPEC.md for the full design, CLAUDE.md for conventions). It now has the Claude powered chat, screen snip and ask, local voice in and out, conversation history, and a permission gated code review mode, and it can be packaged into installers (see Installing below).
+Built in phases (see SPEC.md for the full design, CLAUDE.md for conventions). It now has the Claude powered chat, screen snip and ask, local voice in and out, conversation history, a permission gated code review mode, and a memory it keeps across chats, and it can be packaged into installers (see Installing below).
 
 ## Prerequisites
 
@@ -71,9 +71,10 @@ The orb (phase 1):
 - Leave it alone for about half a minute and it gets drowsy, then falls asleep with little z bubbles. Move the mouse or click to wake it.
 - Drag the orb to reposition it. The position is remembered across restarts and is pulled back on screen if a monitor is disconnected.
 - A quick click (rather than a drag) opens or closes the chat panel.
-- Right-click the orb for a menu: Chat, Snip the screen, Attach a file, New chat, OLED safe mode, Hide Clorby, and Quit.
+- Right-click the orb for a short menu: Chat, Snip the screen, Hide Clorby, and Quit. Chat actions (New chat, Attach a file) live in the chat window, and OLED safe mode lives in Settings, so nothing is duplicated.
+- You can make the orb smaller or larger in Settings (Small, Medium, Large). The eyes keep tracking and it still pulls back on screen if a monitor is unplugged.
 - OLED safe mode (in the orb's right-click menu or the chat Settings) makes the orb drift very slowly around its spot so it never lights the same pixels for long. It is meant for OLED screens, where a static bright image can cause burn-in. The drift is gentle and the position is still remembered; turn it off to keep the orb perfectly still.
-- The tray menu offers Show or Hide Clorby, Open Chat, Snip and Ask, a way to reveal settings.json, and Quit.
+- The tray menu offers Show or Hide Clorby, Open Chat, Snip and Ask, a Start with Windows toggle, a way to reveal settings.json, and Quit.
 
 The chat (phase 2):
 
@@ -83,7 +84,7 @@ The chat (phase 2):
 - The panel header has small icon buttons: Settings, History, New chat, Minimise, and Close.
 - New chat starts a fresh conversation. To pick up a previous one, open History.
 - History lists your past Clorby chats by title and date. Click one to reopen it (the earlier messages are shown and you can carry on), or use the bin icon to delete it. The list shows only Clorby's own chats, not your terminal Claude Code sessions.
-- Settings (the sliders icon) holds the model choice, voice on/off plus voice and speed, and the microphone picker.
+- Settings (the sliders icon) holds the model choice, a Light or Dark theme for the panel, the orb size, voice on/off plus voice and speed, the microphone picker, OLED safe mode, a Start with Windows toggle, editable shortcuts, and how long to keep snips. Changing the shortcuts re-registers them at once and tells you if one is already taken.
 - The message box has icon buttons to take a screen clip and to attach a file, alongside the Talk (microphone) button. These do the same as the orb's right-click menu.
 - The footer shows the model and where billing goes: "Subscription" (your Claude plan, the normal case) or "API key". If an API key is detected, a warning banner also appears, because that bills the API rather than your plan.
 - Links in replies open in your real browser, and only over https.
@@ -107,6 +108,14 @@ Screenshots (phase 3):
 - The snip appears as a chip on the chat input. Type a question and send; Clorby reads the image and answers about it.
 - Snips are saved as PNGs under your user data folder and are read only from there. They are never uploaded anywhere except as part of the model request, and old ones are cleaned up automatically (default after 7 days).
 - To send a file from disk instead of a screen clip, right-click the orb and choose Attach a file. Images show a thumbnail; other files (text, code, and similar) show by name. Clorby may only read the one file you attached, nothing else.
+
+Memory (phase 6):
+
+- A collapsible Memory section sits at the top of the chat panel. Click the "Memory" header to expand it. Inside are the notes Clorby keeps across conversations, an editable text box, Save, and Open file.
+- The notes are read by Clorby at the start of every reply, so it remembers your preferences, facts about you, and decisions from one chat to the next. Keep them short, one note per line.
+- Both you and Clorby can edit the memory. When you tell Clorby something worth keeping, it can update the file itself: the change shows as a quiet "Updated its memory" line in the chat and the panel refreshes. Nothing is saved silently.
+- The file on disk is the source of truth (clorby-memory.md in your user data folder). Open file opens it in your editor; edits there refresh the panel too. If you have unsaved edits in the panel, an update from Clorby will not overwrite them.
+- Memory rides in every request, so keep it small. The panel shows a character count and warns when you are over the limit. Do not store secrets in it.
 
 ## Developer expression test
 

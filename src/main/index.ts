@@ -1,20 +1,22 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, screen, session, shell } from 'electron'
+import { watch } from 'fs'
 import { AgentService } from './agent'
 import { CursorPoller } from './cursor'
 import { registerShortcuts, unregisterShortcuts } from './shortcuts'
-import { loadSettings, saveOrbPosition, updateSettings } from './settings'
+import type { ShortcutHandlers } from './shortcuts'
+import { clampOrbPosition, loadSettings, ORB_SIZES, saveOrbPosition, updateSettings } from './settings'
+import { ensureMemoryFile, memoryPath, readMemory, writeMemory } from './memory'
 import { attachFromFile, cleanupOldSnips, startSnip, wireSnipIpc } from './snip'
 import { createTray, destroyTray, revealSettingsFile } from './tray'
 import { createChatWindow, createOrbWindow, getChatWindow, getOrbWindow } from './windows'
 import { IPC } from '../shared/ipc'
-import type { ChatStatus, Expression, Mood, PermissionDecision, Point, ReviewMode } from '../shared/types'
+import type { ChatSettings, ChatStatus, Expression, Mood, PermissionDecision, Point, ReviewMode, Theme } from '../shared/types'
 
 // Pin the app name so app.getPath('userData') is deterministic across dev and
 // packaged builds. settings.json and the snips folder both live under it.
 app.setName('clorby')
 
 const isDev = !app.isPackaged
-const ORB_HALF = 100
 const CLICK_MAX_DISTANCE = 5
 const CLICK_MAX_DURATION_MS = 250
 
@@ -107,6 +109,7 @@ const agent = new AgentService(
     onInit: (init) => sendToChat(IPC.chatInit, init),
     onDelta: (text) => sendToChat(IPC.chatDelta, text),
     onToolActivity: (activity) => sendToChat(IPC.chatToolActivity, activity),
+    onMemoryUpdated: () => pushMemory(),
     requestPermission: (request) =>
       new Promise<PermissionDecision>((resolve) => {
         const id = `perm-${++permissionCounter}`
@@ -140,11 +143,13 @@ const agent = new AgentService(
   loadSettings
 )
 
+// Derive the centre from the window's actual bounds so it stays correct when
+// the orb is resized.
 function orbCentre(): Point {
   const orb = getOrbWindow()
   if (!orb || orb.isDestroyed()) return { x: 0, y: 0 }
   const b = orb.getBounds()
-  return { x: b.x + ORB_HALF, y: b.y + ORB_HALF }
+  return { x: b.x + Math.round(b.width / 2), y: b.y + Math.round(b.height / 2) }
 }
 
 function onCursorTick(cursor: Point): void {
@@ -213,13 +218,45 @@ function driftTick(): void {
   orb.setPosition(driftCentre.x + driftOffset.x, driftCentre.y + driftOffset.y)
 }
 
+function currentChatSettings(): ChatSettings {
+  const s = loadSettings()
+  return {
+    model: s.model,
+    oledSafe: s.oledSafe,
+    theme: s.theme,
+    orbSize: s.orbSize,
+    autostart: s.autostart,
+    retentionDays: s.snip.retentionDays,
+    toggleChatHotkey: s.hotkeys.toggleChat,
+    snipHotkey: s.hotkeys.snip
+  }
+}
+
 function pushChatSettings(): void {
-  const settings = loadSettings()
-  sendToChat(IPC.chatSettings, { model: settings.model, oledSafe: settings.oledSafe })
+  sendToChat(IPC.chatSettings, currentChatSettings())
 }
 
 function pushProjectState(): void {
   sendToChat(IPC.chatProjectState, agent.projectState(loadSettings().review.allowBash))
+}
+
+// Push the current memory file to the chat panel. Called on load, on the user's
+// save, when Clorby writes it, and when the file changes on disk.
+function pushMemory(): void {
+  sendToChat(IPC.chatMemory, readMemory())
+}
+
+// Coalesce rapid file change events (an editor save can fire several).
+let memoryWatchTimer: ReturnType<typeof setTimeout> | null = null
+function watchMemoryFile(): void {
+  try {
+    watch(memoryPath(), { persistent: false }, () => {
+      if (memoryWatchTimer) clearTimeout(memoryWatchTimer)
+      memoryWatchTimer = setTimeout(pushMemory, 150)
+    })
+  } catch {
+    // Watching is best effort; the panel still updates on save and on Clorby's writes.
+  }
 }
 
 async function chooseProject(): Promise<void> {
@@ -257,6 +294,64 @@ function setOledSafe(enabled: boolean): void {
   }
 }
 
+// Resize the orb, keeping its centre fixed so it does not jump, and persist.
+function setOrbSize(size: number): void {
+  if (!(Object.values(ORB_SIZES) as number[]).includes(size)) return
+  updateSettings({ orbSize: size })
+  const orb = getOrbWindow()
+  if (orb && !orb.isDestroyed()) {
+    const b = orb.getBounds()
+    const cx = b.x + b.width / 2
+    const cy = b.y + b.height / 2
+    const pos = clampOrbPosition(Math.round(cx - size / 2), Math.round(cy - size / 2), size)
+    orb.setBounds({ x: pos.x, y: pos.y, width: size, height: size })
+    driftCentre = { x: pos.x, y: pos.y }
+    saveOrbPosition(pos.x, pos.y)
+  }
+  pushChatSettings()
+}
+
+function setTheme(theme: Theme): void {
+  updateSettings({ theme: theme === 'dark' ? 'dark' : 'light' })
+  pushChatSettings()
+}
+
+function setAutostart(enabled: boolean): void {
+  updateSettings({ autostart: enabled })
+  app.setLoginItemSettings({ openAtLogin: enabled })
+  pushChatSettings()
+}
+
+function setRetention(days: number): void {
+  if (!Number.isFinite(days) || days < 1) return
+  updateSettings({ snip: { retentionDays: Math.round(days) } })
+  pushChatSettings()
+}
+
+// The dev expression shortcuts and the two user hotkeys share one handler set.
+function buildShortcutHandlers(): ShortcutHandlers {
+  return {
+    toggleChat,
+    snip: doSnip,
+    forceExpression: (expression: Expression) => setExpression(expression),
+    forceMood: (mood: Mood) => sendToOrb(IPC.orbForceMood, mood)
+  }
+}
+
+// Re-register the global hotkeys after the user changes them, reporting any
+// that could not be claimed so the panel can say so.
+function saveHotkeys(toggle: string, snipAccelerator: string): void {
+  updateSettings({ hotkeys: { toggleChat: toggle, snip: snipAccelerator } })
+  unregisterShortcuts()
+  const failed = registerShortcuts(
+    { toggleChat: toggle, snip: snipAccelerator },
+    buildShortcutHandlers(),
+    isDev
+  )
+  pushChatSettings()
+  sendToChat(IPC.chatHotkeysResult, { failed })
+}
+
 function doSnip(): void {
   startSnip((result) => {
     pendingAttachment = result.path
@@ -292,13 +387,12 @@ function doNewChat(): void {
 function popupOrbMenu(): void {
   const orb = getOrbWindow()
   if (!orb || orb.isDestroyed()) return
+  // Kept lean: the quick actions you want when the chat is closed. Chat actions
+  // (New chat, Attach) live in the chat window, and OLED safe mode lives in
+  // Settings, so they are not duplicated here.
   const menu = Menu.buildFromTemplate([
     { label: 'Chat', click: showChat },
     { label: 'Snip the screen', click: doSnip },
-    { label: 'Attach a file...', click: () => void doAttachFile() },
-    { type: 'separator' },
-    { label: 'New chat', click: doNewChat },
-    { label: 'OLED safe mode', type: 'checkbox', checked: oledSafe, click: () => setOledSafe(!oledSafe) },
     { type: 'separator' },
     { label: 'Hide Clorby', click: () => setOrbVisible(false) },
     {
@@ -391,6 +485,29 @@ function wireIpc(): void {
 
   ipcMain.on(IPC.chatSetOled, (_event, enabled: boolean) => setOledSafe(Boolean(enabled)))
 
+  ipcMain.on(IPC.chatMemoryRequest, () => pushMemory())
+  ipcMain.on(IPC.chatMemorySave, (_event, content: string) => {
+    if (typeof content === 'string') {
+      writeMemory(content)
+      pushMemory()
+    }
+  })
+  ipcMain.on(IPC.chatMemoryOpen, () => void shell.openPath(memoryPath()))
+
+  ipcMain.on(IPC.chatSetOrbSize, (_event, size: number) => {
+    if (typeof size === 'number') setOrbSize(size)
+  })
+  ipcMain.on(IPC.chatSetTheme, (_event, theme: Theme) => setTheme(theme === 'dark' ? 'dark' : 'light'))
+  ipcMain.on(IPC.chatSetAutostart, (_event, on: boolean) => setAutostart(Boolean(on)))
+  ipcMain.on(IPC.chatSetRetention, (_event, days: number) => {
+    if (typeof days === 'number') setRetention(days)
+  })
+  ipcMain.on(IPC.chatSetHotkeys, (_event, payload: { toggleChat: string; snip: string }) => {
+    if (payload && typeof payload.toggleChat === 'string' && typeof payload.snip === 'string') {
+      saveHotkeys(payload.toggleChat.trim(), payload.snip.trim())
+    }
+  })
+
   ipcMain.on(
     IPC.chatPermissionResponse,
     (_event, payload: { id: string; decision: PermissionDecision }) => {
@@ -459,6 +576,10 @@ function wireIpc(): void {
 function start(): void {
   const settings = loadSettings()
   cleanupOldSnips(settings.snip.retentionDays)
+  ensureMemoryFile()
+  watchMemoryFile()
+  // Keep the OS autostart entry in step with the stored preference.
+  app.setLoginItemSettings({ openAtLogin: settings.autostart })
 
   // The chat window asks for the microphone for voice input. Nothing else in
   // the app requests any permission, so allow media and deny everything else.
@@ -471,8 +592,9 @@ function start(): void {
   const chat = createChatWindow()
   chat.webContents.on('did-finish-load', () => {
     const s = loadSettings()
-    chat.webContents.send(IPC.chatSettings, { model: s.model, oledSafe: s.oledSafe })
+    chat.webContents.send(IPC.chatSettings, currentChatSettings())
     chat.webContents.send(IPC.chatProjectState, agent.projectState(s.review.allowBash))
+    chat.webContents.send(IPC.chatMemory, readMemory())
   })
   wireIpc()
   wireSnipIpc()
@@ -481,6 +603,8 @@ function start(): void {
     toggleOrb,
     openChat: showChat,
     snip: doSnip,
+    autostart: settings.autostart,
+    setAutostart,
     revealSettings: revealSettingsFile,
     quit: () => {
       isQuitting = true
@@ -490,12 +614,7 @@ function start(): void {
 
   const failed = registerShortcuts(
     { toggleChat: settings.hotkeys.toggleChat, snip: settings.hotkeys.snip },
-    {
-      toggleChat,
-      snip: doSnip,
-      forceExpression: (expression: Expression) => setExpression(expression),
-      forceMood: (mood: Mood) => sendToOrb(IPC.orbForceMood, mood)
-    },
+    buildShortcutHandlers(),
     isDev
   )
   if (failed.length > 0) {

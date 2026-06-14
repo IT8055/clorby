@@ -61,10 +61,24 @@ export interface ChatError {
   detail: string | null
 }
 
+export type Theme = 'light' | 'dark'
+
 // Current persisted settings the chat panel can show and change.
 export interface ChatSettings {
   model: string
   oledSafe: boolean
+  theme: Theme
+  orbSize: number
+  autostart: boolean
+  retentionDays: number
+  toggleChatHotkey: string
+  snipHotkey: string
+}
+
+// Result of re-registering global hotkeys after the user changes them: the
+// accelerators that could not be claimed (already taken or malformed).
+export interface HotkeysResult {
+  failed: string[]
 }
 
 // A drag selection from a snip overlay, in CSS pixels relative to that display.
@@ -133,12 +147,18 @@ export interface SnipResult {
 
 export interface Settings {
   orb: { x: number; y: number }
+  // On-screen size of the orb in CSS pixels (square). Presets in the UI.
+  orbSize: number
   hotkeys: { toggleChat: string; snip: string }
   model: 'default' | string
   snip: { retentionDays: number }
   review: { allowBash: boolean }
   // Slowly drift the orb to avoid OLED burn-in.
   oledSafe: boolean
+  // Light or dark theme for the chat panel.
+  theme: Theme
+  // Launch Clorby when Windows starts.
+  autostart: boolean
   lastSessionId: string | null
   claudeExecutablePath: string | null
 }
