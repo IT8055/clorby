@@ -116,6 +116,13 @@ export interface ToolActivity {
   detail: string | null
 }
 
+// A mutation Clorby tried to make while in Review mode, with a project open.
+// title describes what it wanted to do (for example "Edit src/app.ts"). The
+// chat shows a card offering a one-click switch to Act mode.
+export interface ActModeNeeded {
+  title: string
+}
+
 export type PermissionDecision = 'once' | 'session' | 'deny'
 
 // A pending tool permission, shown as a card with Allow once / for session / Deny.

@@ -45,6 +45,9 @@ let visible = true
 let running = false
 let inside = false
 let dragging = false
+// True while a turn is in flight: the face shows an activity ring and stops
+// tracking the cursor.
+let busy = false
 
 // Keep the backing store matched to the window and device pixel ratio, and
 // return the transform scale that maps BASE units onto the window crisply.
@@ -74,7 +77,7 @@ function frame(now: number): void {
   const overlay = moods.update(now, baseIdle, idleMs)
   const params = expressionParams(expression, now)
 
-  face.update(now, { cursor, orbCentre, exprParams: params, overlay, idleMs })
+  face.update(now, { cursor, orbCentre, exprParams: params, overlay, idleMs, busy })
   face.draw(ctx, params, overlay)
 
   requestAnimationFrame(frame)
@@ -118,6 +121,10 @@ bridge.onVisibility((next: boolean) => {
     markActive()
     ensureRunning()
   }
+})
+
+bridge.onBusy((next: boolean) => {
+  busy = next
 })
 
 function hitTest(event: MouseEvent): number {

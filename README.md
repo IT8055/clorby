@@ -81,12 +81,13 @@ The chat (phase 2):
 
 - Type a message and press Enter (Shift+Enter for a new line) or click Send. Clorby streams the reply token by token with markdown.
 - The orb reacts: thinking before the first word, a busy "working" face with eyes scanning while it runs tools, talking while streaming, a happy flash on success, a brief confused tilt when it is blocked from a tool, and a worried face on a real error.
+- While Clorby is working on a reply it shows a small activity ring and stops following your mouse, and the chat shows a "Clorby is working..." line. Both clear when the reply finishes.
 - Stop interrupts a reply cleanly and keeps whatever arrived so far, marked as stopped.
 - The panel header has small icon buttons: Settings, History, New chat, Minimise, and Close.
 - New chat starts a fresh conversation. To pick up a previous one, open History.
 - History lists your past Clorby chats by title and date. Click one to reopen it (the earlier messages are shown and you can carry on), or use the bin icon to delete it. The list shows only Clorby's own chats, not your terminal Claude Code sessions.
 - Settings (the sliders icon) holds the model choice, a Light or Dark theme for the panel, the orb size slider, voice on/off plus voice and speed, the microphone picker, OLED safe mode, a Start with Windows toggle, editable shortcuts, and how long to keep snips. Each shortcut has a short description of what it does; click its box and press the keys to change it, or use Reset, then Save. Changing the shortcuts re-registers them at once and tells you if one is already taken.
-- The message box has icon buttons to take a screen clip and to attach a file, alongside the Talk (microphone) button. Hold the Talk button to record (or hold the orb itself, or press the global talk shortcut, default Ctrl+Alt+V).
+- The message box has icon buttons to take screen clips and to attach files, alongside the Talk (microphone) button. You can queue several at once: each shows as a chip with its own remove button, and they all ride along with your next message. Hold the Talk button to record (or hold the orb itself, or press the global talk shortcut, default Ctrl+Alt+V).
 - The footer shows the model and where billing goes: "Subscription" (your Claude plan, the normal case) or "API key". If an API key is detected, a warning banner also appears, because that bills the API rather than your plan.
 - Links in replies open in your real browser, and only over https.
 - Voice out (in Settings): turn on "Read replies aloud" and Clorby reads each reply with your chosen Windows voice and speed. Fully local, nothing is sent anywhere, and your choices are remembered.
@@ -95,8 +96,9 @@ The chat (phase 2):
 
 Code review (phase 4):
 
-- In Settings, choose a project folder. A bar appears at the bottom of the panel with the project name and a Review / Act switch.
+- In Settings, choose a project folder. A bar appears at the bottom of the panel with the project name and a clear Review / Act switch.
 - Review mode is read-only: Clorby can read, search and list files in the project to answer questions, and cites file paths. It cannot change anything.
+- If you ask for a change while in Review mode, Clorby shows a one-click "Switch to Act mode" card in the chat, so you are never stuck. Click it (or the Act side of the toggle in the project bar) and ask again.
 - Act mode can edit files, but every change is shown as a diff and needs your approval: Allow once, Allow for this session, or Deny. While a card is waiting, the orb pulls its asking face.
 - Reading is confined to the project folder (plus the snips folder and any file you attach). Anything outside is refused.
 - Terminal commands (Bash) are off by default and stay unavailable unless you turn them on in Settings, and even then each command still asks for approval.
@@ -106,9 +108,9 @@ Code review (phase 4):
 Screenshots (phase 3):
 
 - Press Ctrl+Alt+S (or use the tray's Snip and Ask) to dim the screen and drag a box around anything. A live width by height readout follows the selection; Esc cancels.
-- The snip appears as a chip on the chat input. Type a question and send; Clorby reads the image and answers about it.
+- The snip appears as a chip on the chat input. Take several and they all ride along; remove any with the x on its chip. Type a question and send; Clorby reads the images and answers about them.
 - Snips are saved as PNGs under your user data folder and are read only from there. They are never uploaded anywhere except as part of the model request, and old ones are cleaned up automatically (default after 7 days).
-- To send a file from disk instead of a screen clip, right-click the orb and choose Attach a file. Images show a thumbnail; other files (text, code, and similar) show by name. Clorby may only read the one file you attached, nothing else.
+- To send files from disk instead of a screen clip, use the attach button by the message box (or right-click the orb and choose Attach a file). You can pick several at once. Images show a thumbnail; other files (text, code, and similar) show by name. Clorby may only read the files you attached, nothing else.
 
 Memory (phase 6):
 

@@ -7,6 +7,9 @@ export const IPC = {
   orbExpression: 'orb:expression',
   orbForceMood: 'orb:force-mood',
   orbVisibility: 'orb:visibility',
+  // True while a turn is in flight: the orb shows an activity ring and stops
+  // tracking the cursor until the turn ends.
+  orbBusy: 'orb:busy',
 
   // orb renderer to main
   orbSetIgnoreMouse: 'orb:set-ignore-mouse',
@@ -32,6 +35,9 @@ export const IPC = {
   chatToolActivity: 'chat:tool-activity',
   chatPermissionRequest: 'chat:permission-request',
   chatProjectState: 'chat:project-state',
+  // A mutation was blocked because a project is open but Clorby is in Review
+  // mode: the chat shows a one-click "Switch to Act mode" card.
+  chatActNeeded: 'chat:act-needed',
   chatMemory: 'chat:memory',
   chatHotkeysResult: 'chat:hotkeys-result',
   // main asks the chat renderer (which owns the mic and the Whisper model) to

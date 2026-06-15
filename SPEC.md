@@ -172,6 +172,8 @@ Expression states (expressions.ts exports an enum and a draw routine per state):
 
 State transitions are driven only by events from main (chat opened or closed, agent status changes, tool activity, permission requests). The renderer never invents state.
 
+Busy cue: while a turn is in flight main also sends a busy flag. The orb then draws a small activity ring (a faint amber track with a brighter arc rotating about once every 1.5 s) and rests the eyes forward instead of tracking the cursor, so Clorby visibly looks occupied and does not follow the mouse while working. The flag is cleared when the turn ends. The chat panel mirrors this with a quiet "Clorby is working..." line above the composer.
+
 ### 8.1 Personality and ambient moods
 
 Clorby has a light personality. On top of the seven event-driven expressions sits an ambient mood layer (moods.ts) that plays small, autonomous animations so the orb feels alive when nobody is interacting with it. Moods are purely cosmetic decoration over the idle state; they never change the expression state machine, and main remains the only source of expression truth. The mood layer is therefore strictly subordinate.
@@ -284,6 +286,8 @@ Capture: use desktopCapturer with a thumbnail sized to the display's native reso
 
 Hand-off: open the chat window with a thumbnail chip attached to the input. On send, the prompt template includes the user's question plus the absolute file path, and that turn runs with allowedTools: ['Read'] and a canUseTool guard that only permits Read inside the snips directory (and the active project directory once phase 4 exists). Claude Code reads image files natively, so no upload plumbing is needed.
 
+Multiple attachments: snips and picked files queue together, each as its own removable chip, and the attach dialog accepts several files at once. On send the prompt lists every attached file and the read guard confines reads to all of them (plus the snips folder and the project). Removing a chip drops just that file from the queue.
+
 Retention: on startup, delete snips older than snip.retentionDays.
 
 Privacy: snips stay on disk locally and leave the machine only as part of the model request itself.
@@ -298,6 +302,8 @@ Modes:
 - Act: adds Edit and Write; Bash only if review.allowBash is true in settings.
 
 Permissions: permissionMode stays 'default'; every tool call outside the pre-allowed set routes through canUseTool to a card in the chat panel with three choices: Allow once, Allow for this session, Deny. While a card is pending the orb shows the asking face. Keep the per-session allow map inside the agent service. Never use bypassPermissions anywhere in the app.
+
+Act mode prompt: when a mutation is attempted while a project is open but the mode is still Review, the guard denies it and the chat shows a one-click "Switch to Act mode" card rather than a dead end. The card switches mode using the same toggle; the user then asks again. The Review/Act toggle in the project bar is the prominent, clear control for this.
 
 Transcript niceties: render tool activity as quiet status lines ("Reading src/main.ts"), and render Edit tool inputs as unified diffs.
 

@@ -25,6 +25,9 @@ export interface FaceInput {
   exprParams: ExpressionParams
   overlay: MoodOverlay
   idleMs: number
+  // A turn is in flight: draw an activity ring and rest the eyes instead of
+  // tracking the cursor.
+  busy: boolean
 }
 
 function clamp01(value: number): number {
@@ -49,6 +52,7 @@ export class Face {
   private nextSaccadeAt = 0
   private now = 0
   private tilt = 0
+  private busy = false
 
   constructor(now: number) {
     this.nextBlinkAt = now + 2500 + Math.random() * 4500
@@ -57,6 +61,7 @@ export class Face {
 
   update(now: number, input: FaceInput): void {
     this.now = now
+    this.busy = input.busy
     // Ease the head tilt so confused leans in and out smoothly.
     this.tilt += (input.exprParams.headTilt - this.tilt) * 0.15
     this.updateGaze(now, input)
@@ -74,6 +79,10 @@ export class Face {
       target = { x: 0, y: 2 }
     } else if (exprParams.gazeOverride) {
       target = { x: exprParams.gazeOverride.x * MAX_GAZE, y: exprParams.gazeOverride.y * MAX_GAZE }
+    } else if (input.busy) {
+      // Busy with no gaze override (for example streaming a reply): rest the
+      // eyes forward and focused rather than chasing the cursor.
+      target = { x: 0, y: 2 }
     } else if (idleMs > SACCADE_AFTER_MS && idleMs < SLEEP_AFTER_MS) {
       if (now >= this.nextSaccadeAt) {
         const angle = Math.random() * Math.PI * 2
@@ -141,6 +150,9 @@ export class Face {
     const cy = 100 + this.bobOffset(overlay)
 
     this.drawBadgeAndBubbles(ctx, exprParams, overlay)
+    // The activity ring sits in window space around the orb centre, so the
+    // body's tilt and stretch never distort it.
+    if (this.busy) this.drawBusyRing(ctx, cx, cy)
 
     ctx.save()
     ctx.translate(cx, cy)
@@ -326,5 +338,26 @@ export class Face {
       }
       ctx.restore()
     }
+  }
+
+  // A subtle activity ring shown while a turn is in flight: a faint amber track
+  // with a brighter arc that rotates about once every 1.5 s. Radius sits just
+  // outside the body, well inside the glow and the 200px window.
+  private drawBusyRing(ctx: CanvasRenderingContext2D, cx: number, cy: number): void {
+    const r = ORB_RADIUS + 13
+    ctx.save()
+    ctx.translate(cx, cy)
+    ctx.lineWidth = 3
+    ctx.lineCap = 'round'
+    ctx.strokeStyle = 'rgba(247, 181, 0, 0.18)'
+    ctx.beginPath()
+    ctx.arc(0, 0, r, 0, Math.PI * 2)
+    ctx.stroke()
+    const start = (this.now / 1500) * Math.PI * 2
+    ctx.strokeStyle = 'rgba(247, 181, 0, 0.82)'
+    ctx.beginPath()
+    ctx.arc(0, 0, r, start, start + 1.4)
+    ctx.stroke()
+    ctx.restore()
   }
 }

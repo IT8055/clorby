@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '../shared/ipc'
 import type {
+  ActModeNeeded,
   ChatError,
   ChatInit,
   ChatResult,
@@ -62,6 +63,9 @@ const bridge = {
   onProjectState(callback: (state: ProjectState) => void): void {
     ipcRenderer.on(IPC.chatProjectState, (_event, state: ProjectState) => callback(state))
   },
+  onActNeeded(callback: (needed: ActModeNeeded) => void): void {
+    ipcRenderer.on(IPC.chatActNeeded, (_event, needed: ActModeNeeded) => callback(needed))
+  },
   onMemory(callback: (content: string) => void): void {
     ipcRenderer.on(IPC.chatMemory, (_event, content: string) => callback(content))
   },
@@ -92,8 +96,8 @@ const bridge = {
   onSnipAttached(callback: (snip: SnipResult) => void): void {
     ipcRenderer.on(IPC.chatSnipAttached, (_event, snip: SnipResult) => callback(snip))
   },
-  clearSnip(): void {
-    ipcRenderer.send(IPC.chatClearSnip)
+  clearSnip(path?: string): void {
+    ipcRenderer.send(IPC.chatClearSnip, path)
   },
   onHistoryList(callback: (sessions: SessionSummary[]) => void): void {
     ipcRenderer.on(IPC.chatHistoryList, (_event, sessions: SessionSummary[]) => callback(sessions))

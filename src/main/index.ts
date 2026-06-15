@@ -42,8 +42,13 @@ let recording = false
 let orbVisible = true
 let isQuitting = false
 
-// A captured snip or picked file waiting to ride along with the next message.
-let pendingAttachment: string | null = null
+// Captured snips and picked files waiting to ride along with the next message.
+let pendingAttachments: string[] = []
+
+// True only while an act-mode card has already been shown this turn, so a model
+// that tries several edits in Review mode does not stack identical cards. Reset
+// when a turn starts.
+let actCardShownThisTurn = false
 
 // The face currently shown on the orb, so transient states (working) can hand
 // back to the right resting or busy face without main re-deriving it.
@@ -90,6 +95,12 @@ function setExpression(expression: Expression): void {
   sendToOrb(IPC.orbExpression, expression)
 }
 
+// Tell the orb a turn is (or is not) in flight. While busy the orb shows an
+// activity ring and stops tracking the cursor.
+function setBusy(busy: boolean): void {
+  sendToOrb(IPC.orbBusy, busy)
+}
+
 function sendToChat(channel: string, payload?: unknown): void {
   const chat = getChatWindow()
   if (chat && !chat.isDestroyed()) chat.webContents.send(channel, payload)
@@ -129,6 +140,9 @@ function flashConfused(): void {
 function onAgentStatus(status: ChatStatus): void {
   sendToChat(IPC.chatStatus, status)
   if (status === 'thinking') {
+    // A turn is starting: mark busy and reset the per-turn act-card guard.
+    setBusy(true)
+    actCardShownThisTurn = false
     clearExpressionTimer()
     setExpression('thinking')
   } else if (status === 'talking') {
@@ -172,6 +186,14 @@ const agent = new AgentService(
       }
     },
     onToolDenied: () => flashConfused(),
+    onActModeNeeded: (title) => {
+      // Offer a one-click switch, once per turn, and give the orb a brief beat.
+      if (!actCardShownThisTurn) {
+        actCardShownThisTurn = true
+        sendToChat(IPC.chatActNeeded, { title })
+      }
+      flashConfused()
+    },
     onMemoryUpdated: () => pushMemory(),
     requestPermission: (request) =>
       new Promise<PermissionDecision>((resolve) => {
@@ -182,6 +204,7 @@ const agent = new AgentService(
         sendToChat(IPC.chatPermissionRequest, { id, ...request })
       }),
     onFinal: (text, stopped) => {
+      setBusy(false)
       sendToChat(IPC.chatFinal, { text, stopped })
       if (stopped) {
         clearExpressionTimer()
@@ -197,6 +220,7 @@ const agent = new AgentService(
       }
     },
     onError: (error) => {
+      setBusy(false)
       sendToChat(IPC.chatError, error)
       clearExpressionTimer()
       setExpression('error')
@@ -336,6 +360,7 @@ async function chooseProject(): Promise<void> {
     properties: ['openDirectory']
   })
   if (result.canceled || result.filePaths.length === 0) return
+  pendingAttachments = []
   agent.setProject(result.filePaths[0])
   sendToChat(IPC.chatSessionCleared)
   pushProjectState()
@@ -480,7 +505,7 @@ function saveHotkeys(toggle: string, snipAccelerator: string, talk: string): voi
 
 function doSnip(): void {
   startSnip((result) => {
-    pendingAttachment = result.path
+    pendingAttachments.push(result.path)
     showChat()
     sendToChat(IPC.chatSnipAttached, result)
   })
@@ -488,8 +513,8 @@ function doSnip(): void {
 
 async function doAttachFile(): Promise<void> {
   const result = await dialog.showOpenDialog({
-    title: 'Attach a file for Clorby',
-    properties: ['openFile'],
+    title: 'Attach files for Clorby',
+    properties: ['openFile', 'multiSelections'],
     filters: [
       { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] },
       { name: 'Text and code', extensions: ['txt', 'md', 'json', 'js', 'ts', 'tsx', 'py', 'css', 'html', 'csv', 'log', 'yml', 'yaml'] },
@@ -497,14 +522,16 @@ async function doAttachFile(): Promise<void> {
     ]
   })
   if (result.canceled || result.filePaths.length === 0) return
-  const attachment = attachFromFile(result.filePaths[0])
-  pendingAttachment = attachment.path
   showChat()
-  sendToChat(IPC.chatSnipAttached, attachment)
+  for (const filePath of result.filePaths) {
+    const attachment = attachFromFile(filePath)
+    pendingAttachments.push(attachment.path)
+    sendToChat(IPC.chatSnipAttached, attachment)
+  }
 }
 
 function doNewChat(): void {
-  pendingAttachment = null
+  pendingAttachments = []
   agent.newSession()
   sendToChat(IPC.chatSessionCleared)
   settleFace()
@@ -608,9 +635,9 @@ function wireIpc(): void {
   ipcMain.on(IPC.chatSend, (_event, text: string) => {
     if (typeof text === 'string' && text.trim().length > 0) {
       clearPendingPermissions()
-      const attachment = pendingAttachment
-      pendingAttachment = null
-      void agent.send(text, attachment ?? undefined)
+      const attachments = pendingAttachments
+      pendingAttachments = []
+      void agent.send(text, attachments)
     }
   })
 
@@ -619,8 +646,12 @@ function wireIpc(): void {
     void agent.stop()
   })
 
-  ipcMain.on(IPC.chatClearSnip, () => {
-    pendingAttachment = null
+  ipcMain.on(IPC.chatClearSnip, (_event, path?: string) => {
+    if (typeof path === 'string' && path.length > 0) {
+      pendingAttachments = pendingAttachments.filter((p) => p !== path)
+    } else {
+      pendingAttachments = []
+    }
   })
 
   ipcMain.on(IPC.chatNew, () => doNewChat())
@@ -681,6 +712,7 @@ function wireIpc(): void {
 
   ipcMain.on(IPC.chatChooseProject, () => void chooseProject())
   ipcMain.on(IPC.chatClearProject, () => {
+    pendingAttachments = []
     agent.setProject(null)
     sendToChat(IPC.chatSessionCleared)
     pushProjectState()
@@ -713,7 +745,7 @@ function wireIpc(): void {
   })
 
   ipcMain.on(IPC.chatHistoryOpen, (_event, sessionId: string) => {
-    pendingAttachment = null
+    pendingAttachments = []
     agent
       .openSession(sessionId)
       .then((messages) => {

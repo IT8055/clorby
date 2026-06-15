@@ -251,6 +251,10 @@ export interface AgentEvents {
   // Clorby was blocked from a tool it tried to use (confinement, review mode, or
   // Bash off). Drives the brief confused face; not called for a user's Deny.
   onToolDenied(): void
+  // A mutation was blocked purely because a project is open but Clorby is in
+  // Review mode. The chat offers a one-click switch to Act mode. title is what
+  // Clorby wanted to do, for example "Edit src/app.ts".
+  onActModeNeeded(title: string): void
   onMemoryUpdated(): void
   requestPermission(request: {
     kind: ToolKind
@@ -312,17 +316,17 @@ export class AgentService {
   }
 
   // The permission guard. Reads are confined to the project, the snips folder
-  // and the attached file. Mutations require Act mode and a permission decision
+  // and the attached files. Mutations require Act mode and a permission decision
   // (unless already allowed for the session). Bash also needs the setting on.
   // Anything unrecognised is denied. permissionMode stays 'default' throughout.
-  private buildGuard(attachmentPath: string | undefined, allowBash: boolean): CanUseTool {
+  private buildGuard(attachmentPaths: string[], allowBash: boolean): CanUseTool {
     // The model usually passes paths relative to the session cwd (the project),
     // so resolve against that, not the process cwd.
     const base = this.sessionsDir()
     const projectRoot = this.project ? resolve(this.project) : null
-    // Reads may also touch the snips folder and the attached file; writes are
+    // Reads may also touch the snips folder and the attached files; writes are
     // confined to the project only.
-    const readRoots = [this.project, snipsDir(), attachmentPath]
+    const readRoots = [this.project, snipsDir(), ...attachmentPaths]
       .filter((p): p is string => typeof p === 'string' && p.length > 0)
       .map((p) => resolve(p))
     const writeRoots = projectRoot ? [projectRoot] : []
@@ -404,8 +408,14 @@ export class AgentService {
         return allow(input)
       }
       if (WRITE_TOOLS.includes(toolName)) {
-        if (this.mode !== 'act' || !this.project) {
-          return blocked('Review mode is read-only. Switch to Act mode to make changes.')
+        if (!this.project) {
+          return blocked('Open a project folder first, then switch to Act mode to make changes.')
+        }
+        if (this.mode !== 'act') {
+          // A project is open but Clorby is read-only: offer a one-click switch
+          // to Act mode rather than a dead end.
+          this.events.onActModeNeeded(toolView(toolName, input, display(input)).summary)
+          return deny('Clorby is in Review mode (read-only). Switch to Act mode to apply changes, then ask again.')
         }
         if (!isConfined(absOf(str(input['file_path'])), writeRoots)) {
           return blocked('Clorby may only change files inside this project.')
@@ -413,8 +423,12 @@ export class AgentService {
         return gateMutation(toolName, input)
       }
       if (toolName === 'Bash') {
-        if (this.mode !== 'act' || !this.project) {
-          return blocked('Review mode is read-only. Switch to Act mode to run commands.')
+        if (!this.project) {
+          return blocked('Open a project folder first, then switch to Act mode to run commands.')
+        }
+        if (this.mode !== 'act') {
+          this.events.onActModeNeeded('Run a command')
+          return deny('Clorby is in Review mode (read-only). Switch to Act mode to run commands, then ask again.')
         }
         if (!allowBash) {
           // Show the block so a hallucinated "it ran" cannot mislead the user.
@@ -474,7 +488,7 @@ export class AgentService {
     this.abort?.abort()
   }
 
-  async send(text: string, attachmentPath?: string): Promise<void> {
+  async send(text: string, attachmentPaths: string[] = []): Promise<void> {
     if (this.busy) return
     this.busy = true
     this.interrupted = false
@@ -516,20 +530,21 @@ export class AgentService {
       }
     }
     options.tools = [...tools]
-    options.canUseTool = this.buildGuard(attachmentPath, settings.review.allowBash)
+    options.canUseTool = this.buildGuard(attachmentPaths, settings.review.allowBash)
 
     const parts = [text]
     if (this.project) {
       parts.push(
-        `\n\nYou are reviewing the project at ${this.project}. ${
-          this.mode === 'act'
-            ? 'You may edit files, but each change needs the user to approve it.'
-            : 'This is read-only; do not attempt to change files.'
-        } Cite file paths and line numbers.`
+        this.mode === 'act'
+          ? `\n\nYou are reviewing the project at ${this.project}. You are in Act mode, so you may edit files, but each change needs the user to approve it. Cite file paths and line numbers.`
+          : `\n\nYou are reviewing the project at ${this.project}. You are in Review mode, which is read-only: you cannot edit files or run commands here. If the user asks you to make changes, do not claim you made them; tell them briefly to switch to Act mode (a card with a Switch button appears in the chat, or use the Review/Act toggle), then ask again. Cite file paths and line numbers.`
       )
     }
-    if (attachmentPath) {
-      parts.push(`\n\nThe user attached a file at:\n${attachmentPath}\nUse the Read tool to open it, then answer about it.`)
+    if (attachmentPaths.length === 1) {
+      parts.push(`\n\nThe user attached a file at:\n${attachmentPaths[0]}\nUse the Read tool to open it, then answer about it.`)
+    } else if (attachmentPaths.length > 1) {
+      const list = attachmentPaths.map((p) => `- ${p}`).join('\n')
+      parts.push(`\n\nThe user attached ${attachmentPaths.length} files at:\n${list}\nUse the Read tool to open each one, then answer about them.`)
     }
     const promptInput: AsyncIterable<SDKUserMessage> = singleUserMessage(parts.join(''))
 

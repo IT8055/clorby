@@ -1,6 +1,7 @@
 import { renderMarkdown } from './markdown'
 import { VoiceRecorder, listMicrophones, modelReady } from './speech'
 import type {
+  ActModeNeeded,
   ChatError,
   ChatInit,
   ChatResult,
@@ -30,9 +31,8 @@ const sendButton = el<HTMLButtonElement>('send')
 const stopButton = el<HTMLButtonElement>('stop')
 const modelLabel = el<HTMLSpanElement>('model')
 const apiKeyLabel = el<HTMLSpanElement>('apikey')
-const snipChip = el<HTMLDivElement>('snipchip')
-const snipThumb = el<HTMLImageElement>('snipthumb')
-const snipLabel = el<HTMLSpanElement>('sniplabel')
+const snipChips = el<HTMLDivElement>('snipchips')
+const workingBar = el<HTMLDivElement>('workingbar')
 const historyView = el<HTMLDivElement>('historyview')
 const historyList = el<HTMLDivElement>('historylist')
 const settingsView = el<HTMLDivElement>('settingsview')
@@ -81,8 +81,9 @@ let speechRate = Number(localStorage.getItem('clorby.voice.rate') ?? '1.15')
 let selectedVoiceUri = localStorage.getItem('clorby.voice.uri') ?? ''
 let speakEnabled = localStorage.getItem('clorby.voice') === 'on'
 
-let attachedThumb: string | null = null
-let attachedName: string | null = null
+// Attachments queued for the next message: snips and picked files. Each shows
+// as a removable chip; all ride along when the message is sent.
+const attachments: SnipResult[] = []
 let streaming = false
 // The assistant turn can interleave text bubbles, tool lines and permission
 // cards, so text accumulates into a "current" bubble that is finalised whenever
@@ -297,10 +298,9 @@ function removeHint(): void {
 }
 
 function clearSnipChip(): void {
-  attachedThumb = null
-  attachedName = null
-  snipThumb.style.display = ''
-  snipChip.style.display = 'none'
+  attachments.length = 0
+  snipChips.replaceChildren()
+  snipChips.classList.remove('show')
 }
 
 function scrollToBottom(): void {
@@ -323,6 +323,7 @@ function setComposerBusy(busy: boolean): void {
   input.disabled = busy
   sendButton.style.display = busy ? 'none' : ''
   stopButton.style.display = busy ? '' : 'none'
+  workingBar.classList.toggle('show', busy)
   if (!busy) input.focus()
 }
 
@@ -371,16 +372,18 @@ function send(): void {
   removeHint()
 
   const userBubble = addMessage('user').firstElementChild as HTMLDivElement
-  if (attachedThumb) {
-    const img = document.createElement('img')
-    img.className = 'snap'
-    img.src = attachedThumb
-    userBubble.appendChild(img)
-  } else if (attachedName) {
-    const file = document.createElement('div')
-    file.className = 'attachname'
-    file.textContent = `Attached: ${attachedName}`
-    userBubble.appendChild(file)
+  for (const att of attachments) {
+    if (att.thumbnail) {
+      const img = document.createElement('img')
+      img.className = 'snap'
+      img.src = att.thumbnail
+      userBubble.appendChild(img)
+    } else {
+      const file = document.createElement('div')
+      file.className = 'attachname'
+      file.textContent = `Attached: ${att.name}`
+      userBubble.appendChild(file)
+    }
   }
   const userText = document.createElement('span')
   userText.textContent = text
@@ -558,6 +561,38 @@ bridge.onProjectState((state: ProjectState) => {
   }
 })
 
+// Clorby tried to change something while in Review mode. Offer a one-click
+// switch to Act mode rather than a dead end; switching reuses setMode, and the
+// project bar toggle updates from the project state that follows.
+bridge.onActNeeded((needed: ActModeNeeded) => {
+  clearPending()
+  finalizeBubble()
+  const card = document.createElement('div')
+  card.className = 'actcard'
+  const title = document.createElement('div')
+  title.className = 'atitle'
+  title.textContent = 'Clorby is in Review mode'
+  card.appendChild(title)
+  const desc = document.createElement('div')
+  desc.className = 'adesc'
+  desc.textContent = `Review mode is read-only, so it cannot make changes yet. It wanted to: ${needed.title}.`
+  card.appendChild(desc)
+  const button = document.createElement('button')
+  button.className = 'switch'
+  button.textContent = 'Switch to Act mode'
+  button.addEventListener('click', () => {
+    bridge.setMode('act')
+    button.remove()
+    const outcome = document.createElement('div')
+    outcome.className = 'aoutcome'
+    outcome.textContent = 'Now in Act mode. Ask again and I will make the changes.'
+    card.appendChild(outcome)
+  })
+  card.appendChild(button)
+  transcript.appendChild(card)
+  scrollToBottom()
+})
+
 // Memory panel: a collapsible editor for the notes Clorby keeps across chats.
 // The file on disk is the source of truth; this view reflects it and writes
 // back. Both the user and Clorby can change it.
@@ -608,18 +643,40 @@ bridge.onMemory((content: string) => {
 updateMemCount()
 bridge.requestMemory()
 
-bridge.onSnipAttached((snip: SnipResult) => {
-  attachedThumb = snip.thumbnail
-  attachedName = snip.name
+// Build one removable chip for an attachment. Removing it drops the queued
+// file in main too, so it does not ride along with the next message.
+function addChip(snip: SnipResult): void {
+  const chip = document.createElement('div')
+  chip.className = 'snipchip'
   if (snip.thumbnail) {
-    snipThumb.src = snip.thumbnail
-    snipThumb.style.display = ''
-    snipLabel.textContent = snip.name
-  } else {
-    snipThumb.style.display = 'none'
-    snipLabel.textContent = snip.name
+    const img = document.createElement('img')
+    img.src = snip.thumbnail
+    img.alt = snip.name
+    chip.appendChild(img)
   }
-  snipChip.style.display = 'flex'
+  const label = document.createElement('span')
+  label.className = 'label'
+  label.textContent = snip.name
+  label.title = snip.name
+  chip.appendChild(label)
+  const remove = document.createElement('button')
+  remove.title = 'Remove'
+  remove.innerHTML = '&times;'
+  remove.addEventListener('click', () => {
+    const i = attachments.indexOf(snip)
+    if (i >= 0) attachments.splice(i, 1)
+    chip.remove()
+    bridge.clearSnip(snip.path)
+    if (attachments.length === 0) snipChips.classList.remove('show')
+  })
+  chip.appendChild(remove)
+  snipChips.appendChild(chip)
+}
+
+bridge.onSnipAttached((snip: SnipResult) => {
+  attachments.push(snip)
+  addChip(snip)
+  snipChips.classList.add('show')
   removeHint()
   input.focus()
 })
@@ -790,10 +847,6 @@ micButton.addEventListener('pointerleave', () => {
 
 el<HTMLButtonElement>('snip').addEventListener('click', () => bridge.requestSnip())
 el<HTMLButtonElement>('attach').addEventListener('click', () => bridge.requestAttach())
-el<HTMLButtonElement>('snipremove').addEventListener('click', () => {
-  bridge.clearSnip()
-  clearSnipChip()
-})
 el<HTMLButtonElement>('settings').addEventListener('click', () => {
   historyView.style.display = 'none'
   settingsView.style.display = 'flex'

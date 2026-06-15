@@ -413,18 +413,26 @@
         font-weight: 600;
         color: #3f5a26;
       }
+      .projectbar .modelabel {
+        font-size: 10px;
+        font-weight: 600;
+        color: #6b8a4a;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
       .projectbar .modes {
         display: flex;
-        border: 1px solid #bcd39a;
-        border-radius: 6px;
+        border: 1px solid #9cbd72;
+        border-radius: 7px;
         overflow: hidden;
       }
       .projectbar .modes button {
         border: none;
         background: #f6faf0;
         color: #3f5a26;
-        font-size: 11px;
-        padding: 3px 9px;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 5px 13px;
         cursor: pointer;
       }
       .projectbar .modes button.active {
@@ -555,33 +563,115 @@
       .membody .memrow button:hover {
         background: #d6cdae;
       }
-      .snipchip {
+      .snipchips {
         display: none;
-        align-items: center;
-        gap: 8px;
+        flex-wrap: wrap;
+        gap: 6px;
         padding: 6px 8px;
+        max-height: 116px;
+        overflow-y: auto;
         background: #f3eedd;
         border-top: 1px solid #e7dfc6;
       }
-      .snipchip img {
-        max-height: 44px;
-        max-width: 120px;
-        border-radius: 6px;
+      .snipchips.show {
+        display: flex;
+      }
+      .snipchip {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 4px 4px 8px;
+        background: #fffdf6;
         border: 1px solid #ddd3b4;
+        border-radius: 8px;
+        max-width: 100%;
+      }
+      .snipchip img {
+        max-height: 34px;
+        max-width: 80px;
+        border-radius: 4px;
       }
       .snipchip .label {
-        flex: 1;
         font-size: 12px;
         color: #6b6655;
+        max-width: 150px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .snipchip button {
+        flex: 0 0 auto;
         border: none;
         background: #e0d8bf;
         border-radius: 6px;
-        width: 22px;
-        height: 22px;
+        width: 20px;
+        height: 20px;
         cursor: pointer;
         color: #6b6655;
+      }
+      .workingbar {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 12px;
+        font-size: 12px;
+        color: #7a7461;
+        background: #f3eedd;
+        border-top: 1px solid #e7dfc6;
+      }
+      .workingbar.show {
+        display: flex;
+      }
+      .workingbar .workingdot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #f7b500;
+        animation: workingpulse 1.1s ease-in-out infinite;
+      }
+      @keyframes workingpulse {
+        0%,
+        100% {
+          opacity: 0.3;
+          transform: scale(0.8);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+      .actcard {
+        align-self: flex-start;
+        max-width: 92%;
+        background: #eef4e6;
+        border: 1px solid #bcd39a;
+        border-radius: 10px;
+        padding: 10px;
+      }
+      .actcard .atitle {
+        font-weight: 600;
+        margin-bottom: 2px;
+        color: #3f5a26;
+      }
+      .actcard .adesc {
+        font-size: 12px;
+        color: #5c6b47;
+        margin-bottom: 8px;
+      }
+      .actcard button.switch {
+        border: none;
+        border-radius: 6px;
+        padding: 6px 12px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        background: #7aa34a;
+        color: #fff;
+      }
+      .actcard .aoutcome {
+        margin-top: 8px;
+        font-size: 12px;
+        color: #3f5a26;
       }
       .composer {
         padding: 8px;
@@ -679,10 +769,15 @@
       :root[data-theme='dark'] .overlaybar,
       :root[data-theme='dark'] .composer,
       :root[data-theme='dark'] .footer,
-      :root[data-theme='dark'] .snipchip,
+      :root[data-theme='dark'] .snipchips,
+      :root[data-theme='dark'] .workingbar,
       :root[data-theme='dark'] .memorybar {
         background: #26241f;
         border-color: #3a362d;
+      }
+      :root[data-theme='dark'] .snipchip {
+        background: #201f1b;
+        border-color: #4a4538;
       }
       :root[data-theme='dark'] .footer {
         color: #a59f8c;
@@ -691,6 +786,7 @@
       :root[data-theme='dark'] .memhead,
       :root[data-theme='dark'] .toolline,
       :root[data-theme='dark'] .toolline .dot,
+      :root[data-theme='dark'] .workingbar,
       :root[data-theme='dark'] .hint,
       :root[data-theme='dark'] .meta,
       :root[data-theme='dark'] .field > .label,
@@ -755,6 +851,15 @@
       :root[data-theme='dark'] .permcard {
         background: #322a16;
         border-color: #5a4d24;
+      }
+      :root[data-theme='dark'] .actcard {
+        background: #25301c;
+        border-color: #44602c;
+      }
+      :root[data-theme='dark'] .actcard .atitle,
+      :root[data-theme='dark'] .actcard .adesc,
+      :root[data-theme='dark'] .actcard .aoutcome {
+        color: #b8d29a;
       }
       .hkrow {
         display: flex;
@@ -857,18 +962,19 @@
     <div class="transcript" id="transcript">
       <div class="hint" id="hint">Ask me anything. I run on your Claude subscription.</div>
     </div>
-    <div class="snipchip" id="snipchip">
-      <img id="snipthumb" alt="attachment" />
-      <span class="label" id="sniplabel">Attachment</span>
-      <button id="snipremove" title="Remove">&times;</button>
-    </div>
+    <div class="snipchips" id="snipchips"></div>
     <div class="projectbar" id="projectbar">
       <span class="pname" id="projectname"></span>
+      <span class="modelabel">Mode</span>
       <div class="modes">
-        <button id="modereview">Review</button>
-        <button id="modeact">Act</button>
+        <button id="modereview" title="Read-only: Clorby answers questions but cannot edit">Review</button>
+        <button id="modeact" title="Clorby can edit files (each change asks first)">Act</button>
       </div>
       <button class="exit" id="projectexit" title="Leave project">&times;</button>
+    </div>
+    <div class="workingbar" id="workingbar">
+      <span class="workingdot"></span>
+      <span>Clorby is working...</span>
     </div>
     <div class="composer">
       <button class="cbtn" id="snip" title="Screen clip" aria-label="Screen clip">

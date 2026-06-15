@@ -16,6 +16,9 @@ const bridge = {
   onVisibility(callback: (visible: boolean) => void): void {
     ipcRenderer.on(IPC.orbVisibility, (_event, visible: boolean) => callback(visible))
   },
+  onBusy(callback: (busy: boolean) => void): void {
+    ipcRenderer.on(IPC.orbBusy, (_event, busy: boolean) => callback(busy))
+  },
   setIgnoreMouse(ignore: boolean): void {
     ipcRenderer.send(IPC.orbSetIgnoreMouse, ignore)
   },
