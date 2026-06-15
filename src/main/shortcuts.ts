@@ -1,15 +1,17 @@
 import { globalShortcut } from 'electron'
-import { EXPRESSIONS } from '../shared/types'
+import { EXPRESSIONS, MOODS } from '../shared/types'
 import type { Expression, Mood } from '../shared/types'
 
 export interface ShortcutAccelerators {
   toggleChat: string
   snip: string
+  talk: string
 }
 
 export interface ShortcutHandlers {
   toggleChat: () => void
   snip: () => void
+  talk: () => void
   forceExpression: (expression: Expression) => void
   forceMood: (mood: Mood) => void
 }
@@ -37,16 +39,18 @@ export function registerShortcuts(
 
   tryRegister(accelerators.toggleChat, handlers.toggleChat)
   tryRegister(accelerators.snip, handlers.snip)
+  tryRegister(accelerators.talk, handlers.talk)
 
   if (isDev) {
-    // Force each expression for visual tuning.
+    // Force each of the nine expressions for visual tuning. The expression count
+    // outgrew the single-digit row, so the moods moved to the Shift row below.
     EXPRESSIONS.forEach((expression, index) => {
       tryRegister(`Control+Alt+${index + 1}`, () => handlers.forceExpression(expression))
     })
-    // Trigger the ambient moods on demand.
-    tryRegister('Control+Alt+8', () => handlers.forceMood('yawn'))
-    tryRegister('Control+Alt+9', () => handlers.forceMood('smile'))
-    tryRegister('Control+Alt+0', () => handlers.forceMood('sleep'))
+    // Trigger the six ambient moods on demand.
+    MOODS.forEach((mood, index) => {
+      tryRegister(`Control+Alt+Shift+${index + 1}`, () => handlers.forceMood(mood))
+    })
   }
 
   return failed

@@ -9,6 +9,8 @@ export type Expression =
   | 'happy'
   | 'error'
   | 'asking'
+  | 'working'
+  | 'confused'
 
 export const EXPRESSIONS: readonly Expression[] = [
   'idle',
@@ -17,12 +19,16 @@ export const EXPRESSIONS: readonly Expression[] = [
   'talking',
   'happy',
   'error',
-  'asking'
+  'asking',
+  'working',
+  'confused'
 ]
 
 // Ambient moods are cosmetic decoration over the idle expression. They are not
 // part of the expression state machine; see SPEC.md section 8.1.
-export type Mood = 'yawn' | 'smile' | 'sleep'
+export type Mood = 'yawn' | 'smile' | 'sleep' | 'lookaround' | 'stretch' | 'whistle'
+
+export const MOODS: readonly Mood[] = ['yawn', 'smile', 'sleep', 'lookaround', 'stretch', 'whistle']
 
 export interface Point {
   x: number
@@ -73,6 +79,7 @@ export interface ChatSettings {
   retentionDays: number
   toggleChatHotkey: string
   snipHotkey: string
+  talkHotkey: string
 }
 
 // Result of re-registering global hotkeys after the user changes them: the
@@ -149,7 +156,7 @@ export interface Settings {
   orb: { x: number; y: number }
   // On-screen size of the orb in CSS pixels (square). Presets in the UI.
   orbSize: number
-  hotkeys: { toggleChat: string; snip: string }
+  hotkeys: { toggleChat: string; snip: string; talk: string }
   model: 'default' | string
   snip: { retentionDays: number }
   review: { allowBash: boolean }

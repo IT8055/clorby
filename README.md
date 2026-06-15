@@ -72,24 +72,25 @@ The orb (phase 1):
 - Drag the orb to reposition it. The position is remembered across restarts and is pulled back on screen if a monitor is disconnected.
 - A quick click (rather than a drag) opens or closes the chat panel.
 - Right-click the orb for a short menu: Chat, Snip the screen, Hide Clorby, and Quit. Chat actions (New chat, Attach a file) live in the chat window, and OLED safe mode lives in Settings, so nothing is duplicated.
-- You can make the orb smaller or larger in Settings (Small, Medium, Large). The eyes keep tracking and it still pulls back on screen if a monitor is unplugged.
-- OLED safe mode (in the orb's right-click menu or the chat Settings) makes the orb drift very slowly around its spot so it never lights the same pixels for long. It is meant for OLED screens, where a static bright image can cause burn-in. The drift is gentle and the position is still remembered; turn it off to keep the orb perfectly still.
+- You can make the orb any size with the slider in Settings (about 64 to 260 px, with a live readout). The eyes keep tracking and it still pulls back on screen if a monitor is unplugged.
+- Press and hold the orb (about half a second, without dragging) to talk: Clorby starts listening, and when you let go it transcribes what you said into the message box. A quick click still opens or closes the chat, and a drag still moves it.
+- OLED safe mode (in the chat Settings) makes the orb drift very slowly around its spot so it never lights the same pixels for long. The drift now travels a little further than the orb's own width and height, so no body or glow pixel ever stays put; it scales with the orb size and stays on screen, which means in this mode the orb rests slightly in from a corner. It is meant for OLED screens, where a static bright image can cause burn-in. Turn it off to keep the orb perfectly still.
 - The tray menu offers Show or Hide Clorby, Open Chat, Snip and Ask, a Start with Windows toggle, a way to reveal settings.json, and Quit.
 
 The chat (phase 2):
 
 - Type a message and press Enter (Shift+Enter for a new line) or click Send. Clorby streams the reply token by token with markdown.
-- The orb reacts: thinking before the first word, talking while streaming, a happy flash on success, a worried face on error.
+- The orb reacts: thinking before the first word, a busy "working" face with eyes scanning while it runs tools, talking while streaming, a happy flash on success, a brief confused tilt when it is blocked from a tool, and a worried face on a real error.
 - Stop interrupts a reply cleanly and keeps whatever arrived so far, marked as stopped.
 - The panel header has small icon buttons: Settings, History, New chat, Minimise, and Close.
 - New chat starts a fresh conversation. To pick up a previous one, open History.
 - History lists your past Clorby chats by title and date. Click one to reopen it (the earlier messages are shown and you can carry on), or use the bin icon to delete it. The list shows only Clorby's own chats, not your terminal Claude Code sessions.
-- Settings (the sliders icon) holds the model choice, a Light or Dark theme for the panel, the orb size, voice on/off plus voice and speed, the microphone picker, OLED safe mode, a Start with Windows toggle, editable shortcuts, and how long to keep snips. Changing the shortcuts re-registers them at once and tells you if one is already taken.
-- The message box has icon buttons to take a screen clip and to attach a file, alongside the Talk (microphone) button. These do the same as the orb's right-click menu.
+- Settings (the sliders icon) holds the model choice, a Light or Dark theme for the panel, the orb size slider, voice on/off plus voice and speed, the microphone picker, OLED safe mode, a Start with Windows toggle, editable shortcuts, and how long to keep snips. Each shortcut has a short description of what it does; click its box and press the keys to change it, or use Reset, then Save. Changing the shortcuts re-registers them at once and tells you if one is already taken.
+- The message box has icon buttons to take a screen clip and to attach a file, alongside the Talk (microphone) button. Hold the Talk button to record (or hold the orb itself, or press the global talk shortcut, default Ctrl+Alt+V).
 - The footer shows the model and where billing goes: "Subscription" (your Claude plan, the normal case) or "API key". If an API key is detected, a warning banner also appears, because that bills the API rather than your plan.
 - Links in replies open in your real browser, and only over https.
 - Voice out (in Settings): turn on "Read replies aloud" and Clorby reads each reply with your chosen Windows voice and speed. Fully local, nothing is sent anywhere, and your choices are remembered.
-- Voice in (the Talk button by the message box): hold it, speak, and release. Your words are transcribed on your machine with a local Whisper model and dropped into the message box for you to review and send. While you hold Talk the button shows the elapsed time and a level meter, so you can see it is hearing you. If you have several microphones, pick the right one in Settings. The first use downloads the small model once (the only network call this makes); after that it works offline, and no audio leaves your machine.
+- Voice in: hold the Talk button by the message box, hold the orb itself, or press the global talk shortcut (a toggle: press to start, press again to stop). Your words are transcribed on your machine with a local Whisper model and dropped into the message box for you to review and send, never sent automatically. While the Talk button records it shows the elapsed time and a level meter, so you can see it is hearing you. If you have several microphones, pick the right one in Settings. The first use downloads the small model once (the only network call this makes); after that it works offline, and no audio leaves your machine.
 - The header's Minimise sends the panel to the taskbar; Close tucks it away (click the orb to bring it back).
 
 Code review (phase 4):
@@ -121,12 +122,10 @@ Memory (phase 6):
 
 In a development build (not a packaged one), global shortcuts force each face for visual tuning:
 
-- Ctrl+Alt+1 through Ctrl+Alt+7: idle, listening, thinking, talking, happy, error, asking.
-- Ctrl+Alt+8: yawn.
-- Ctrl+Alt+9: smile.
-- Ctrl+Alt+0: sleep.
+- Ctrl+Alt+1 through Ctrl+Alt+9: idle, listening, thinking, talking, happy, error, asking, working, confused.
+- Ctrl+Alt+Shift+1 through Ctrl+Alt+Shift+6: the moods, in order: yawn, smile, sleep, look-around, stretch, whistle.
 
-The chat toggle hotkey is Ctrl+Alt+Space, and the snip hotkey is Ctrl+Alt+S. If another app has already claimed one, Clorby logs it and carries on (the tray menu still works); hotkeys become configurable in phase 5.
+The default shortcuts are Ctrl+Alt+Space (toggle chat), Ctrl+Alt+S (snip), and Ctrl+Alt+V (talk). All three are editable in Settings. If another app has already claimed one, Clorby logs it and carries on (the tray menu still works).
 
 ## Settings
 

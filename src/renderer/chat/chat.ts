@@ -58,13 +58,22 @@ const memOpen = el<HTMLButtonElement>('memopen')
 const memDot = el<HTMLSpanElement>('memdot')
 const memCount = el<HTMLSpanElement>('memcount')
 const themeSelect = el<HTMLSelectElement>('themeselect')
-const orbSizeSelect = el<HTMLSelectElement>('orbsizeselect')
+const orbSizeRange = el<HTMLInputElement>('orbsizerange')
+const orbSizeVal = el<HTMLSpanElement>('orbsizeval')
 const autostartToggle = el<HTMLInputElement>('autostarttoggle')
 const hkChat = el<HTMLInputElement>('hkchat')
 const hkSnip = el<HTMLInputElement>('hksnip')
+const hkTalk = el<HTMLInputElement>('hktalk')
 const hkSave = el<HTMLButtonElement>('hksave')
 const hkNote = el<HTMLSpanElement>('hknote')
 const retentionSelect = el<HTMLSelectElement>('retentionselect')
+
+// Defaults for the reset-to-default buttons, kept in step with settings.ts.
+const DEFAULT_HOTKEYS = {
+  chat: 'Control+Alt+Space',
+  snip: 'Control+Alt+S',
+  talk: 'Control+Alt+V'
+} as const
 
 const recorder = new VoiceRecorder()
 let selectedMic = localStorage.getItem('clorby.mic') ?? ''
@@ -156,13 +165,67 @@ themeSelect.addEventListener('change', () => {
   applyTheme(theme)
   bridge.setTheme(theme)
 })
-orbSizeSelect.addEventListener('change', () => bridge.setOrbSize(Number(orbSizeSelect.value)))
+// Live orb resize while dragging the slider; coalesce to one send per frame.
+let orbSizeRaf = 0
+orbSizeRange.addEventListener('input', () => {
+  orbSizeVal.textContent = `${orbSizeRange.value} px`
+  if (orbSizeRaf) return
+  orbSizeRaf = requestAnimationFrame(() => {
+    orbSizeRaf = 0
+    bridge.setOrbSize(Number(orbSizeRange.value))
+  })
+})
 autostartToggle.addEventListener('change', () => bridge.setAutostart(autostartToggle.checked))
 retentionSelect.addEventListener('change', () => bridge.setRetention(Number(retentionSelect.value)))
+
+// Turn a keydown into an Electron accelerator string. Returns null for a
+// modifier-only press so the field waits for a real key.
+function accelFromEvent(event: KeyboardEvent): string | null {
+  const parts: string[] = []
+  if (event.ctrlKey) parts.push('Control')
+  if (event.altKey) parts.push('Alt')
+  if (event.shiftKey) parts.push('Shift')
+  if (event.metaKey) parts.push('Super')
+
+  const key = event.key
+  let main: string | null = null
+  if (key.length === 1 && /[a-z]/i.test(key)) main = key.toUpperCase()
+  else if (/^[0-9]$/.test(key)) main = key
+  else if (key === ' ') main = 'Space'
+  else if (key === 'ArrowUp') main = 'Up'
+  else if (key === 'ArrowDown') main = 'Down'
+  else if (key === 'ArrowLeft') main = 'Left'
+  else if (key === 'ArrowRight') main = 'Right'
+  else if (/^F([1-9]|1[0-9]|2[0-4])$/.test(key)) main = key
+  else if (key.length === 1) main = key
+
+  if (!main) return null
+  parts.push(main)
+  return parts.join('+')
+}
+
+// Click a shortcut box, then press the combo to capture it.
+for (const field of [hkChat, hkSnip, hkTalk]) {
+  field.addEventListener('keydown', (event) => {
+    event.preventDefault()
+    const accel = accelFromEvent(event)
+    if (accel) field.value = accel
+  })
+}
+
+for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('.hkreset'))) {
+  button.addEventListener('click', () => {
+    const which = button.dataset['hk']
+    if (which === 'chat') hkChat.value = DEFAULT_HOTKEYS.chat
+    else if (which === 'snip') hkSnip.value = DEFAULT_HOTKEYS.snip
+    else if (which === 'talk') hkTalk.value = DEFAULT_HOTKEYS.talk
+  })
+}
+
 hkSave.addEventListener('click', () => {
   hkNote.classList.remove('bad')
   hkNote.textContent = 'Saving...'
-  bridge.setHotkeys(hkChat.value.trim(), hkSnip.value.trim())
+  bridge.setHotkeys(hkChat.value.trim(), hkSnip.value.trim(), hkTalk.value.trim())
 })
 bridge.onHotkeysResult((result) => {
   if (result.failed.length > 0) {
@@ -173,6 +236,11 @@ bridge.onHotkeysResult((result) => {
     hkNote.textContent = 'Shortcuts saved.'
   }
 })
+
+// Voice capture triggered from the orb (hold) or the global talk hotkey. The
+// recorder lives here; the transcript lands in the input via stopTalk.
+bridge.onVoiceStart(() => void startTalk())
+bridge.onVoiceStop(() => void stopTalk())
 el<HTMLButtonElement>('chooseproject').addEventListener('click', () => bridge.chooseProject())
 el<HTMLButtonElement>('clearproject').addEventListener('click', () => bridge.clearProject())
 modeReview.addEventListener('click', () => bridge.setMode('review'))
@@ -189,12 +257,17 @@ bridge.onSettings((settings: ChatSettings) => {
   oledToggle.checked = settings.oledSafe
   themeSelect.value = settings.theme
   applyTheme(settings.theme)
-  orbSizeSelect.value = String(settings.orbSize)
+  // Do not stomp the slider while the user is dragging it.
+  if (document.activeElement !== orbSizeRange) {
+    orbSizeRange.value = String(settings.orbSize)
+    orbSizeVal.textContent = `${settings.orbSize} px`
+  }
   autostartToggle.checked = settings.autostart
   retentionSelect.value = String(settings.retentionDays)
   // Do not stomp a hotkey field the user is editing.
   if (document.activeElement !== hkChat) hkChat.value = settings.toggleChatHotkey
   if (document.activeElement !== hkSnip) hkSnip.value = settings.snipHotkey
+  if (document.activeElement !== hkTalk) hkTalk.value = settings.talkHotkey
 })
 
 // Voice output (local speech synthesis).

@@ -131,8 +131,14 @@ const bridge = {
   setAutostart(enabled: boolean): void {
     ipcRenderer.send(IPC.chatSetAutostart, enabled)
   },
-  setHotkeys(toggleChat: string, snip: string): void {
-    ipcRenderer.send(IPC.chatSetHotkeys, { toggleChat, snip })
+  setHotkeys(toggleChat: string, snip: string, talk: string): void {
+    ipcRenderer.send(IPC.chatSetHotkeys, { toggleChat, snip, talk })
+  },
+  onVoiceStart(callback: () => void): void {
+    ipcRenderer.on(IPC.chatVoiceStart, () => callback())
+  },
+  onVoiceStop(callback: () => void): void {
+    ipcRenderer.on(IPC.chatVoiceStop, () => callback())
   },
   setRetention(days: number): void {
     ipcRenderer.send(IPC.chatSetRetention, days)

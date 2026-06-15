@@ -48,6 +48,7 @@ export class Face {
   private saccade: Point = { x: 0, y: 0 }
   private nextSaccadeAt = 0
   private now = 0
+  private tilt = 0
 
   constructor(now: number) {
     this.nextBlinkAt = now + 2500 + Math.random() * 4500
@@ -56,6 +57,8 @@ export class Face {
 
   update(now: number, input: FaceInput): void {
     this.now = now
+    // Ease the head tilt so confused leans in and out smoothly.
+    this.tilt += (input.exprParams.headTilt - this.tilt) * 0.15
     this.updateGaze(now, input)
     this.updateBlink(now, input.overlay)
   }
@@ -64,7 +67,10 @@ export class Face {
     const { overlay, exprParams, idleMs } = input
     let target: Point
 
-    if (overlay.suppressTracking) {
+    if (overlay.gaze) {
+      // A mood (look-around) is steering the pupils directly, in face px.
+      target = overlay.gaze
+    } else if (overlay.suppressTracking) {
       target = { x: 0, y: 2 }
     } else if (exprParams.gazeOverride) {
       target = { x: exprParams.gazeOverride.x * MAX_GAZE, y: exprParams.gazeOverride.y * MAX_GAZE }
@@ -138,6 +144,8 @@ export class Face {
 
     ctx.save()
     ctx.translate(cx, cy)
+    if (this.tilt !== 0) ctx.rotate(this.tilt)
+    if (overlay.stretch > 0.001) ctx.scale(1 - overlay.stretch * 0.06, 1 + overlay.stretch * 0.14)
     this.drawGlow(ctx)
     this.drawBody(ctx, brightness)
     this.drawSpecular(ctx)
@@ -212,7 +220,7 @@ export class Face {
 
   private drawBrows(ctx: CanvasRenderingContext2D, exprParams: ExpressionParams, overlay: MoodOverlay): void {
     if (overlay.eyesClosed > 0.5) return
-    if (exprParams.browRaise === 0 && exprParams.browInnerDrop === 0) return
+    if (exprParams.browRaise === 0 && exprParams.browInnerDrop === 0 && exprParams.browAsym === 0) return
 
     ctx.strokeStyle = COLOUR_DARK
     ctx.lineWidth = 3
@@ -222,9 +230,11 @@ export class Face {
     for (const side of [-1, 1]) {
       const inner = side * (EYE_DX - 6)
       const outer = side * (EYE_DX + 8)
+      // browAsym lifts the left brow and lowers the right for a quizzical look.
+      const asym = side === -1 ? -exprParams.browAsym : exprParams.browAsym
       ctx.beginPath()
-      ctx.moveTo(inner, browY + exprParams.browInnerDrop)
-      ctx.lineTo(outer, browY)
+      ctx.moveTo(inner, browY + exprParams.browInnerDrop + asym)
+      ctx.lineTo(outer, browY + asym)
       ctx.stroke()
     }
   }
@@ -234,6 +244,15 @@ export class Face {
     ctx.strokeStyle = COLOUR_DARK
     ctx.lineWidth = 4
     ctx.lineCap = 'round'
+
+    if (overlay.mouthPurse > 0.02) {
+      // Whistle: a small pursed circle.
+      const r = 2 + overlay.mouthPurse * 4
+      ctx.beginPath()
+      ctx.arc(0, MOUTH_Y, r, 0, Math.PI * 2)
+      ctx.fill()
+      return
+    }
 
     if (overlay.mouthYawn > 0.02) {
       const h = 4 + overlay.mouthYawn * 20

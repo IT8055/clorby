@@ -21,9 +21,11 @@ Goals:
 Non-goals (v1):
 
 - No continuous live screen watching. Snapshots on demand only.
-- No voice input or output.
+- No awareness of what the user is doing: Clorby never inspects which apps or windows are focused, their titles, or global keystrokes. Liveliness comes from its own activity, the cursor it already tracks for eye movement, and idle time, never from monitoring the user.
 - No macOS or Linux builds (parking lot).
 - No auto-updater, no telemetry, no crash uploaders.
+
+Voice is supported, and runs entirely on this machine: speech to text is a local Whisper model (transformers.js) and speech out is the system speech synthesiser. Nothing audio related leaves the device. See section 20.
 
 ## 3. Prerequisites
 
@@ -165,8 +167,10 @@ Expression states (expressions.ts exports an enum and a draw routine per state):
 - happy: result arrived successfully; squinty smile for 1.2 s, then back to idle or listening.
 - error: flat worried mouth, slight downward brows; persists until the next user input.
 - asking: a tool permission is pending; raised brows plus a small floating "?" badge above the orb.
+- working: a tool is running (reading, searching or editing in review mode); eyes scan side to side as if reading, a slightly focused brow, distinct from thinking (which is the still, gaze-up-and-left wait before the first token). Set on tool activity and cleared when prose resumes or the turn ends.
+- confused: a soft, recoverable "that did not work"; a small head tilt and an uneven brow, gentler than error. Shown briefly when Clorby is blocked from a tool (read or write outside the project, a denied permission, Bash while off) and then settles back. error stays for hard turn-level failures (offline, auth, credit).
 
-State transitions are driven only by events from main (chat opened or closed, agent status changes, permission requests). The renderer never invents state.
+State transitions are driven only by events from main (chat opened or closed, agent status changes, tool activity, permission requests). The renderer never invents state.
 
 ### 8.1 Personality and ambient moods
 
@@ -181,11 +185,14 @@ Moods:
 
 - yawn: a slow mouth stretch (open wide, ease shut over about 1.2 s) with the eyes squeezing nearly closed at the peak, then a small settle. Occasional.
 - smile: a brief warm squinty smile for about 1.5 s, then ease back to the resting idle smile. Occasional.
+- look-around: the eyes glance to one side and back over about 2 s, as if something caught Clorby's attention, then return to resting.
+- stretch: a brief squash and stretch of the whole body over about 1.5 s with the eyes squinting at the peak, like waking the shoulders, then a settle.
+- whistle: the mouth purses to a small circle for a couple of seconds with a gentle bob, passing the time.
 - drowsy then sleeping: driven by inactivity rather than the random scheduler. If the cursor has not moved and the orb has not been clicked for about 30 seconds, Clorby grows drowsy (eyelids lower over a few seconds, pupils stop tracking, bob slows and deepens), then falls asleep: eyes closed as gentle curves, slow deep bob, and small "z" bubbles drifting up and fading above the orb. Any cursor movement or click wakes Clorby promptly with a quick blink-and-stretch back to idle. Sleep takes priority over the random scheduler.
 
 Tuning constants (idle-to-drowsy delay, drowsy-to-sleep duration, mood gap range, per-mood durations) live as named constants at the top of moods.ts.
 
-Dev-only expression test: in unpackaged builds, register global shortcuts Ctrl+Alt+1 through Ctrl+Alt+7 to force each expression state for visual tuning. Ctrl+Alt+8, Ctrl+Alt+9 and Ctrl+Alt+0 trigger the yawn, smile and sleep moods on demand.
+Dev-only expression test: in unpackaged builds, register global shortcuts Ctrl+Alt+1 through Ctrl+Alt+9 to force each of the nine expression states for visual tuning, and Ctrl+Alt+Shift+1 through Ctrl+Alt+Shift+6 to trigger the six moods (yawn, smile, sleep, look-around, stretch, whistle) on demand. The expression count outgrew the old single-digit scheme, so moods moved to the Shift row.
 
 Performance budget: requestAnimationFrame for drawing, skip drawing entirely while the orb is hidden, pause the cursor poller when hidden. Targets: under 2 percent CPU and under 150 MB working set at idle.
 
@@ -202,8 +209,8 @@ settings.json lives in app.getPath('userData'). Write atomically (write to a tem
 ```ts
 interface Settings {
   orb: { x: number; y: number }
-  orbSize: number                  // on-screen size, presets 150 / 200 / 260, default 200
-  hotkeys: { toggleChat: string; snip: string }
+  orbSize: number                  // on-screen size in px, free slider clamped to 64..260, default 200
+  hotkeys: { toggleChat: string; snip: string; talk: string }  // talk: push to talk, default Control+Alt+V
   model: 'default' | string        // explicit model id to conserve credit, optional
   snip: { retentionDays: number }  // default 7
   review: { allowBash: boolean }   // default false
@@ -314,7 +321,7 @@ Build: orb window with face, eye tracking, blink, idle bob, expression engine wi
 - [ ] App launches to tray; orb appears at saved or default position
 - [ ] Eyes track the cursor smoothly across all monitors at 30 Hz with easing
 - [ ] Random blinking and idle bob; all seven expressions reachable via Ctrl+Alt+1..7 in dev
-- [ ] Ambient moods over idle only: occasional yawn and smile, and drowsy-then-sleep after inactivity that wakes on cursor move or click; moods reachable via Ctrl+Alt+8..0 in dev and never override an event-driven expression
+- [ ] Ambient moods over idle only: occasional yawn and smile, and drowsy-then-sleep after inactivity that wakes on cursor move or click; moods reachable via the dev mood shortcuts (see section 8.1) and never override an event-driven expression
 - [ ] Click-through verified: windows behind the transparent corners receive clicks
 - [ ] Dragging repositions the orb; click (under 5 px, under 250 ms) toggles the chat shell
 - [ ] Position persists across restart; off-screen recovery clamps to the nearest display
@@ -371,6 +378,19 @@ Build: cross-session memory per section 19. A collapsible Memory panel in the ch
 - [ ] External edits and Clorby's writes refresh the panel, except when the user has unsaved edits focused
 - [ ] The memory slice is capped for the prompt; the panel shows the count and warns when over
 
+### Phase 7: liveliness and voice
+
+Build: a free orb-size slider, a friendlier shortcut editor with a third "talk" hotkey, hold-the-orb-to-talk and a global talk toggle, two new expressions (working, confused), three new ambient moods, and an OLED drift that actually clears every lit pixel. See section 20 for the voice and gesture detail.
+
+- [ ] Orb size is a free slider clamped to 64..260 px with a live readout; eye tracking and off-screen recovery hold at any size
+- [ ] Shortcut settings show a plain-English description per action, capture a combo by pressing it, and offer reset-to-default, with conflicts reported inline
+- [ ] Holding the orb past the hold threshold records (orb shows listening); release transcribes into the chat input and reveals the window; a quick click still toggles chat and a drag still moves it
+- [ ] A configurable global talk hotkey toggles recording (press to start, press again to stop) into the chat input; transcripts never auto-send
+- [ ] working plays while a tool runs and gives way to talking when prose resumes; confused shows briefly when Clorby is blocked from a tool, while error remains for hard failures
+- [ ] The three new moods play over idle only and never override an event-driven expression; all nine expressions and six moods are reachable via the dev shortcuts
+- [ ] OLED safe mode drifts past the full orb size so no body or glow pixel stays lit, the drift scales with orb size, and the wander box stays within the work area
+- [ ] No foreground-app, window-title or global keyboard watching is introduced
+
 ## 17. Risks and mitigations
 
 - SDK surface drift: option and message names change between releases. The installed package's TypeScript types are the ground truth; the sketches in section 11 are intent, not gospel.
@@ -394,3 +414,21 @@ Writing by Clorby: the memory tools (Read, Write, Edit) are enabled on every tur
 Editing by the user: a collapsible Memory panel sits at the top of the chat window, always present. Expanded, it shows an editable text area, a character count with an over-cap warning, Save, and Open file.
 
 Co-editing: the memory file is watched. Clorby's writes, the user's Save, and external editor edits all refresh the panel, except when the user has unsaved edits focused, so in-progress typing is never clobbered. Notes are kept short, one per line; secrets are never stored.
+
+## 20. Voice and hold-to-talk (phase 7)
+
+Voice is local. Speech to text uses a small Whisper model through transformers.js, decoded and transcribed in the chat renderer; speech out uses the system speech synthesiser. The model and the microphone permission both live in the chat window, so all capture happens there. The orb window stays a sandboxed canvas and never gets a microphone or the model; it only triggers capture.
+
+Gesture model (extends section 7): a press inside the orb is resolved by main from its own cursor poll into one of three outcomes.
+
+- Quick release (under 5 px of movement and under 250 ms): a click, which toggles the chat window.
+- Movement past 5 px: a reposition, which drags the orb and persists the new position.
+- Held past about 400 ms with under 5 px of movement: talk mode. Main tells the chat renderer to start recording and sets the listening face on the orb. On release, main tells the renderer to stop and transcribe, reveals and focuses the chat window, and the recognised text is placed in the message box. Any movement before the threshold cancels the talk candidacy so a slow drag never starts recording.
+
+Global talk hotkey: a third configurable accelerator (default Control+Alt+V). Electron global shortcuts fire on key-down only, with no key-up, so a global push-to-talk cannot detect release; the global hotkey is therefore a toggle (press to start, press again to stop), while the orb hold is a true press-and-hold. Both share the one recorder and the one rule below.
+
+The rule: transcribed text always lands in the chat input for the user to read and edit, and is never sent automatically. Silence and model-loading feedback reuse the existing microphone-button states. While recording, the orb shows listening; drift and drag are suspended.
+
+IPC: main to chat carries voice-start and voice-stop; the renderer owns the recorder and writes the result into the input itself, so no transcript round-trips through main.
+
+OLED drift (revises section 10's oledSafe): the drift amplitude is derived from the orb size so peak-to-peak travel exceeds the full orb width and height, clearing both the body and the faint glow. The orbit centre is clamped inward from the work-area edges so the whole wander stays on-screen, which means in OLED mode Clorby rests slightly in from a corner. The slow ten-minute cycle is unchanged, so the motion stays barely perceptible.

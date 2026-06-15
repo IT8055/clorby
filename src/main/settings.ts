@@ -6,8 +6,16 @@ import type { Settings } from '../shared/types'
 const DEFAULT_ORB_SIZE = 200
 const DEFAULT_MARGIN = 24
 
-// Orb size presets offered in Settings, smallest to largest.
-export const ORB_SIZES = { small: 150, medium: 200, large: 260 } as const
+// Orb size is a free slider in Settings, clamped to this range (px).
+export const ORB_SIZE_MIN = 64
+export const ORB_SIZE_MAX = 260
+
+// Clamp any requested orb size into the allowed range. A non-finite value falls
+// back to the default rather than throwing.
+export function clampOrbSize(size: number): number {
+  if (!Number.isFinite(size)) return DEFAULT_ORB_SIZE
+  return Math.round(Math.min(Math.max(size, ORB_SIZE_MIN), ORB_SIZE_MAX))
+}
 
 let cache: Settings | null = null
 
@@ -27,7 +35,7 @@ function defaults(): Settings {
   return {
     orb: defaultOrbPosition(),
     orbSize: DEFAULT_ORB_SIZE,
-    hotkeys: { toggleChat: 'Control+Alt+Space', snip: 'Control+Alt+S' },
+    hotkeys: { toggleChat: 'Control+Alt+Space', snip: 'Control+Alt+S', talk: 'Control+Alt+V' },
     model: 'default',
     snip: { retentionDays: 7 },
     review: { allowBash: false },
@@ -45,7 +53,7 @@ function withDefaults(partial: Partial<Settings>): Settings {
   const base = defaults()
   return {
     orb: { ...base.orb, ...(partial.orb ?? {}) },
-    orbSize: partial.orbSize ?? base.orbSize,
+    orbSize: clampOrbSize(partial.orbSize ?? base.orbSize),
     hotkeys: { ...base.hotkeys, ...(partial.hotkeys ?? {}) },
     model: partial.model ?? base.model,
     snip: { ...base.snip, ...(partial.snip ?? {}) },

@@ -2,7 +2,7 @@
 
 Clorby is an always-on-top animated desktop companion for Windows: a yellow orb whose eyes follow the mouse, with a Claude-powered chat panel, screen snipping for visual questions, and a code review mode. Electron plus TypeScript, model access exclusively through the Claude Agent SDK on the owner's Claude subscription. The full design lives in SPEC.md, which is the source of truth. If this file and SPEC.md disagree, SPEC.md wins. If SPEC.md is silent on something, ask rather than invent.
 
-## Current phase: 5
+## Current phase: 7
 
 Implement only the current phase, exactly as defined in SPEC.md section 16. Do not build ahead, do not add stubs for future phases beyond what the spec explicitly asks for. When the phase's acceptance checklist passes, stop, summarise what was done, and wait. Gary bumps the number above when ready.
 

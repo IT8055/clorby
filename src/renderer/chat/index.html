@@ -309,6 +309,7 @@
       .field .speedrow {
         display: flex;
         gap: 8px;
+        align-items: center;
       }
       .field .speedrow select {
         width: auto;
@@ -784,6 +785,35 @@
       .hknote.bad {
         color: #b3402f;
       }
+      .hkitem {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 8px;
+      }
+      .hkdesc {
+        font-size: 11px;
+        color: #9a937e;
+      }
+      .hkrow .hkreset {
+        flex: 0 0 auto;
+      }
+      .rangeinput {
+        flex: 1;
+        min-width: 0;
+        accent-color: #f7b500;
+      }
+      .rangeval {
+        flex: 0 0 auto;
+        font-size: 12px;
+        color: #6b6655;
+        min-width: 46px;
+        text-align: right;
+      }
+      :root[data-theme='dark'] .hkdesc,
+      :root[data-theme='dark'] .rangeval {
+        color: #a59f8c;
+      }
     </style>
   </head>
   <body>
@@ -907,11 +937,10 @@
         </div>
         <div class="field">
           <span class="label">Orb size</span>
-          <select id="orbsizeselect">
-            <option value="150">Small</option>
-            <option value="200">Medium</option>
-            <option value="260">Large</option>
-          </select>
+          <div class="speedrow">
+            <input type="range" id="orbsizerange" class="rangeinput" min="64" max="260" step="2" />
+            <span class="rangeval" id="orbsizeval">200 px</span>
+          </div>
         </div>
         <div class="field row">
           <span class="label">Read replies aloud</span>
@@ -943,10 +972,27 @@
           <input type="checkbox" id="autostarttoggle" />
         </div>
         <div class="field">
-          <span class="label">Shortcuts (restart not needed)</span>
-          <div class="hkrow">
-            <input id="hkchat" type="text" spellcheck="false" placeholder="Toggle chat" title="Toggle chat" />
-            <input id="hksnip" type="text" spellcheck="false" placeholder="Snip" title="Snip" />
+          <span class="label">Shortcuts (click a box, press the keys)</span>
+          <div class="hkitem">
+            <span class="hkdesc">Open or close the chat panel</span>
+            <div class="hkrow">
+              <input id="hkchat" class="hkinput" type="text" readonly spellcheck="false" />
+              <button class="sbtn hkreset" data-hk="chat">Reset</button>
+            </div>
+          </div>
+          <div class="hkitem">
+            <span class="hkdesc">Snip a screen region and ask about it</span>
+            <div class="hkrow">
+              <input id="hksnip" class="hkinput" type="text" readonly spellcheck="false" />
+              <button class="sbtn hkreset" data-hk="snip">Reset</button>
+            </div>
+          </div>
+          <div class="hkitem">
+            <span class="hkdesc">Talk: toggle voice recording into the message box</span>
+            <div class="hkrow">
+              <input id="hktalk" class="hkinput" type="text" readonly spellcheck="false" />
+              <button class="sbtn hkreset" data-hk="talk">Reset</button>
+            </div>
           </div>
           <div class="hkrow">
             <span class="hknote" id="hknote"></span>

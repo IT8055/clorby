@@ -248,6 +248,9 @@ export interface AgentEvents {
   onError(error: ChatError): void
   onStatus(status: ChatStatus): void
   onToolActivity(activity: ToolActivity): void
+  // Clorby was blocked from a tool it tried to use (confinement, review mode, or
+  // Bash off). Drives the brief confused face; not called for a user's Deny.
+  onToolDenied(): void
   onMemoryUpdated(): void
   requestPermission(request: {
     kind: ToolKind
@@ -364,6 +367,13 @@ export class AgentService {
       return deny('You declined this action.')
     }
 
+    // A block Clorby ran into rather than a user's choice: surface the confused
+    // face once, then deny with the explanation.
+    const blocked = (message: string): PermissionResult => {
+      this.events.onToolDenied()
+      return deny(message)
+    }
+
     return async (toolName, input) => {
       // Clorby's own memory: always readable and writable, outside any project
       // and with no permission card, but every change is surfaced so it is
@@ -379,7 +389,7 @@ export class AgentService {
       }
       if (toolName === 'Read') {
         if (!isConfined(absOf(str(input['file_path'])), readRoots)) {
-          return deny('Clorby may only read files in this project.')
+          return blocked('Clorby may only read files in this project.')
         }
         this.events.onToolActivity(toolView('Read', input, display(input)))
         return allow(input)
@@ -388,32 +398,32 @@ export class AgentService {
         // Both default to the project cwd, but an explicit path must stay inside.
         const pathArg = str(input['path'])
         if (pathArg.length > 0 && !isConfined(absOf(pathArg), readRoots)) {
-          return deny('Clorby may only search inside this project.')
+          return blocked('Clorby may only search inside this project.')
         }
         this.events.onToolActivity(toolView(toolName, input, display(input)))
         return allow(input)
       }
       if (WRITE_TOOLS.includes(toolName)) {
         if (this.mode !== 'act' || !this.project) {
-          return deny('Review mode is read-only. Switch to Act mode to make changes.')
+          return blocked('Review mode is read-only. Switch to Act mode to make changes.')
         }
         if (!isConfined(absOf(str(input['file_path'])), writeRoots)) {
-          return deny('Clorby may only change files inside this project.')
+          return blocked('Clorby may only change files inside this project.')
         }
         return gateMutation(toolName, input)
       }
       if (toolName === 'Bash') {
         if (this.mode !== 'act' || !this.project) {
-          return deny('Review mode is read-only. Switch to Act mode to run commands.')
+          return blocked('Review mode is read-only. Switch to Act mode to run commands.')
         }
         if (!allowBash) {
           // Show the block so a hallucinated "it ran" cannot mislead the user.
           this.events.onToolActivity({ kind: 'bash', summary: 'Blocked a terminal command (turn Bash on in Settings)', detail: str(input['command']) })
-          return deny('Terminal commands are off. Turn them on in Settings.')
+          return blocked('Terminal commands are off. Turn them on in Settings.')
         }
         return gateMutation('Bash', input)
       }
-      return deny(`Clorby will not use ${toolName}.`)
+      return blocked(`Clorby will not use ${toolName}.`)
     }
   }
 

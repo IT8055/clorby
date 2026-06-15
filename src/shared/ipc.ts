@@ -34,6 +34,10 @@ export const IPC = {
   chatProjectState: 'chat:project-state',
   chatMemory: 'chat:memory',
   chatHotkeysResult: 'chat:hotkeys-result',
+  // main asks the chat renderer (which owns the mic and the Whisper model) to
+  // start or stop a voice capture; the transcript lands in the input there.
+  chatVoiceStart: 'chat:voice-start',
+  chatVoiceStop: 'chat:voice-stop',
 
   // chat renderer to main
   chatRequestHide: 'chat:request-hide',
