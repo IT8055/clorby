@@ -919,6 +919,28 @@
       :root[data-theme='dark'] .rangeval {
         color: #a59f8c;
       }
+      .dropzone {
+        display: none;
+        position: absolute;
+        inset: 0;
+        z-index: 20;
+        align-items: center;
+        justify-content: center;
+        background: rgba(247, 181, 0, 0.12);
+        border: 3px dashed #f7b500;
+        border-radius: 8px;
+        box-sizing: border-box;
+        pointer-events: none;
+        font-weight: 600;
+        color: #8a6d00;
+      }
+      .dropzone.show {
+        display: flex;
+      }
+      :root[data-theme='dark'] .dropzone {
+        background: rgba(247, 181, 0, 0.1);
+        color: #e0a93a;
+      }
     </style>
   </head>
   <body>
@@ -1041,6 +1063,10 @@
             <option value="dark">Dark</option>
           </select>
         </div>
+        <div class="field row">
+          <span class="label">Keep chat window on top</span>
+          <input type="checkbox" id="alwaysontoptoggle" />
+        </div>
         <div class="field">
           <span class="label">Orb size</span>
           <div class="speedrow">
@@ -1117,6 +1143,7 @@
         </div>
       </div>
     </div>
+    <div class="dropzone" id="dropzone"><span>Drop to attach</span></div>
     <script type="module" src="./chat.ts"></script>
   </body>
 </html>

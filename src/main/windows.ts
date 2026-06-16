@@ -56,7 +56,7 @@ export function createOrbWindow(settings: Settings): BrowserWindow {
   return win
 }
 
-export function createChatWindow(): BrowserWindow {
+export function createChatWindow(alwaysOnTop: boolean): BrowserWindow {
   const win = new BrowserWindow({
     width: 400,
     height: 560,
@@ -64,7 +64,7 @@ export function createChatWindow(): BrowserWindow {
     minHeight: 560,
     frame: false,
     transparent: false,
-    alwaysOnTop: true,
+    alwaysOnTop,
     // Shown in the taskbar so the Minimise button has somewhere to go.
     skipTaskbar: false,
     minimizable: true,
@@ -78,7 +78,7 @@ export function createChatWindow(): BrowserWindow {
     }
   })
 
-  win.setAlwaysOnTop(true, 'screen-saver')
+  if (alwaysOnTop) win.setAlwaysOnTop(true, 'screen-saver')
   win.on('closed', () => {
     chatWindow = null
   })

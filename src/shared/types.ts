@@ -80,6 +80,7 @@ export interface ChatSettings {
   toggleChatHotkey: string
   snipHotkey: string
   talkHotkey: string
+  chatAlwaysOnTop: boolean
 }
 
 // Result of re-registering global hotkeys after the user changes them: the
@@ -171,6 +172,8 @@ export interface Settings {
   oledSafe: boolean
   // Light or dark theme for the chat panel.
   theme: Theme
+  // Keep the chat window above other windows. Off lets it sit behind them.
+  chatAlwaysOnTop: boolean
   // Launch Clorby when Windows starts.
   autostart: boolean
   lastSessionId: string | null

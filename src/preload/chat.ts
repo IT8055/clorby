@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IPC } from '../shared/ipc'
 import type {
   ActModeNeeded,
@@ -120,6 +120,14 @@ const bridge = {
   requestAttach(): void {
     ipcRenderer.send(IPC.chatRequestAttach)
   },
+  // Resolve the absolute path of a dropped File (Electron removed File.path),
+  // then hand the paths to main to attach like any picked file.
+  pathForFile(file: File): string {
+    return webUtils.getPathForFile(file)
+  },
+  attachPaths(paths: string[]): void {
+    ipcRenderer.send(IPC.chatAttachPaths, paths)
+  },
   setModel(model: string): void {
     ipcRenderer.send(IPC.chatSetModel, model)
   },
@@ -131,6 +139,9 @@ const bridge = {
   },
   setTheme(theme: Theme): void {
     ipcRenderer.send(IPC.chatSetTheme, theme)
+  },
+  setAlwaysOnTop(enabled: boolean): void {
+    ipcRenderer.send(IPC.chatSetAlwaysOnTop, enabled)
   },
   setAutostart(enabled: boolean): void {
     ipcRenderer.send(IPC.chatSetAutostart, enabled)

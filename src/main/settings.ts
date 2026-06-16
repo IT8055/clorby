@@ -41,6 +41,7 @@ function defaults(): Settings {
     review: { allowBash: false },
     oledSafe: false,
     theme: 'light',
+    chatAlwaysOnTop: true,
     autostart: false,
     lastSessionId: null,
     claudeExecutablePath: null
@@ -60,6 +61,7 @@ function withDefaults(partial: Partial<Settings>): Settings {
     review: { ...base.review, ...(partial.review ?? {}) },
     oledSafe: partial.oledSafe ?? base.oledSafe,
     theme: partial.theme ?? base.theme,
+    chatAlwaysOnTop: partial.chatAlwaysOnTop ?? base.chatAlwaysOnTop,
     autostart: partial.autostart ?? base.autostart,
     lastSessionId: partial.lastSessionId ?? base.lastSessionId,
     claudeExecutablePath: partial.claudeExecutablePath ?? base.claudeExecutablePath

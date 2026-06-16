@@ -58,6 +58,8 @@ const memOpen = el<HTMLButtonElement>('memopen')
 const memDot = el<HTMLSpanElement>('memdot')
 const memCount = el<HTMLSpanElement>('memcount')
 const themeSelect = el<HTMLSelectElement>('themeselect')
+const alwaysOnTopToggle = el<HTMLInputElement>('alwaysontoptoggle')
+const dropzone = el<HTMLDivElement>('dropzone')
 const orbSizeRange = el<HTMLInputElement>('orbsizerange')
 const orbSizeVal = el<HTMLSpanElement>('orbsizeval')
 const autostartToggle = el<HTMLInputElement>('autostarttoggle')
@@ -166,6 +168,7 @@ themeSelect.addEventListener('change', () => {
   applyTheme(theme)
   bridge.setTheme(theme)
 })
+alwaysOnTopToggle.addEventListener('change', () => bridge.setAlwaysOnTop(alwaysOnTopToggle.checked))
 // Live orb resize while dragging the slider; coalesce to one send per frame.
 let orbSizeRaf = 0
 orbSizeRange.addEventListener('input', () => {
@@ -258,6 +261,7 @@ bridge.onSettings((settings: ChatSettings) => {
   oledToggle.checked = settings.oledSafe
   themeSelect.value = settings.theme
   applyTheme(settings.theme)
+  alwaysOnTopToggle.checked = settings.chatAlwaysOnTop
   // Do not stomp the slider while the user is dragging it.
   if (document.activeElement !== orbSizeRange) {
     orbSizeRange.value = String(settings.orbSize)
@@ -881,6 +885,46 @@ window.addEventListener('keydown', (event) => {
     else if (historyView.style.display === 'flex') historyView.style.display = 'none'
     else bridge.requestHide()
   }
+})
+
+// Drag and drop a file onto the window to attach it, rather than letting the
+// browser navigate away to open it. Only file drags are intercepted, so text
+// can still be dropped into the message box. webUtils in the preload resolves
+// each File to its absolute path, which main turns into an attachment.
+function dragHasFiles(event: DragEvent): boolean {
+  return Array.from(event.dataTransfer?.types ?? []).includes('Files')
+}
+
+let dragDepth = 0
+
+window.addEventListener('dragenter', (event) => {
+  if (!dragHasFiles(event)) return
+  event.preventDefault()
+  dragDepth += 1
+  dropzone.classList.add('show')
+})
+window.addEventListener('dragover', (event) => {
+  if (!dragHasFiles(event)) return
+  event.preventDefault()
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
+})
+window.addEventListener('dragleave', (event) => {
+  if (!dragHasFiles(event)) return
+  event.preventDefault()
+  dragDepth -= 1
+  if (dragDepth <= 0) {
+    dragDepth = 0
+    dropzone.classList.remove('show')
+  }
+})
+window.addEventListener('drop', (event) => {
+  if (!dragHasFiles(event)) return
+  event.preventDefault()
+  dragDepth = 0
+  dropzone.classList.remove('show')
+  const files = Array.from(event.dataTransfer?.files ?? [])
+  const paths = files.map((file) => bridge.pathForFile(file)).filter((p) => p.length > 0)
+  if (paths.length > 0) bridge.attachPaths(paths)
 })
 
 // Markdown links never navigate the panel; they open in the real browser.

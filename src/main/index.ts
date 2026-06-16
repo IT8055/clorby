@@ -323,7 +323,8 @@ function currentChatSettings(): ChatSettings {
     retentionDays: s.snip.retentionDays,
     toggleChatHotkey: s.hotkeys.toggleChat,
     snipHotkey: s.hotkeys.snip,
-    talkHotkey: s.hotkeys.talk
+    talkHotkey: s.hotkeys.talk,
+    chatAlwaysOnTop: s.chatAlwaysOnTop
   }
 }
 
@@ -438,6 +439,18 @@ function setTheme(theme: Theme): void {
   pushChatSettings()
 }
 
+// Toggle whether the chat window floats above other windows, applying it to the
+// live window straight away as well as persisting the choice.
+function setChatAlwaysOnTop(enabled: boolean): void {
+  updateSettings({ chatAlwaysOnTop: enabled })
+  const chat = getChatWindow()
+  if (chat && !chat.isDestroyed()) {
+    if (enabled) chat.setAlwaysOnTop(true, 'screen-saver')
+    else chat.setAlwaysOnTop(false)
+  }
+  pushChatSettings()
+}
+
 function setAutostart(enabled: boolean): void {
   updateSettings({ autostart: enabled })
   app.setLoginItemSettings({ openAtLogin: enabled })
@@ -511,23 +524,31 @@ function doSnip(): void {
   })
 }
 
-async function doAttachFile(): Promise<void> {
-  const result = await dialog.showOpenDialog({
-    title: 'Attach files for Clorby',
-    properties: ['openFile', 'multiSelections'],
-    filters: [
-      { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] },
-      { name: 'Text and code', extensions: ['txt', 'md', 'json', 'js', 'ts', 'tsx', 'py', 'css', 'html', 'csv', 'log', 'yml', 'yaml'] },
-      { name: 'All files', extensions: ['*'] }
-    ]
-  })
-  if (result.canceled || result.filePaths.length === 0) return
-  showChat()
-  for (const filePath of result.filePaths) {
+// Queue files (from the picker or a drag and drop) for the next message and
+// show a chip for each. All files ride along regardless of type.
+function attachFiles(paths: string[]): void {
+  for (const filePath of paths) {
+    if (typeof filePath !== 'string' || filePath.length === 0) continue
     const attachment = attachFromFile(filePath)
     pendingAttachments.push(attachment.path)
     sendToChat(IPC.chatSnipAttached, attachment)
   }
+}
+
+async function doAttachFile(): Promise<void> {
+  const result = await dialog.showOpenDialog({
+    title: 'Attach files for Clorby',
+    properties: ['openFile', 'multiSelections'],
+    // All files first so the picker defaults to showing everything, not just images.
+    filters: [
+      { name: 'All files', extensions: ['*'] },
+      { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] },
+      { name: 'Text and code', extensions: ['txt', 'md', 'json', 'js', 'ts', 'tsx', 'py', 'css', 'html', 'csv', 'log', 'yml', 'yaml'] }
+    ]
+  })
+  if (result.canceled || result.filePaths.length === 0) return
+  showChat()
+  attachFiles(result.filePaths)
 }
 
 function doNewChat(): void {
@@ -658,6 +679,9 @@ function wireIpc(): void {
 
   ipcMain.on(IPC.chatRequestSnip, () => doSnip())
   ipcMain.on(IPC.chatRequestAttach, () => void doAttachFile())
+  ipcMain.on(IPC.chatAttachPaths, (_event, paths: string[]) => {
+    if (Array.isArray(paths)) attachFiles(paths)
+  })
 
   ipcMain.on(IPC.chatSetModel, (_event, model: string) => {
     if (typeof model === 'string' && model.length > 0) updateSettings({ model })
@@ -678,6 +702,7 @@ function wireIpc(): void {
     if (typeof size === 'number') setOrbSize(size)
   })
   ipcMain.on(IPC.chatSetTheme, (_event, theme: Theme) => setTheme(theme === 'dark' ? 'dark' : 'light'))
+  ipcMain.on(IPC.chatSetAlwaysOnTop, (_event, on: boolean) => setChatAlwaysOnTop(Boolean(on)))
   ipcMain.on(IPC.chatSetAutostart, (_event, on: boolean) => setAutostart(Boolean(on)))
   ipcMain.on(IPC.chatSetRetention, (_event, days: number) => {
     if (typeof days === 'number') setRetention(days)
@@ -780,7 +805,7 @@ function start(): void {
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === 'media')
 
   createOrbWindow(settings)
-  const chat = createChatWindow()
+  const chat = createChatWindow(settings.chatAlwaysOnTop)
   chat.webContents.on('did-finish-load', () => {
     const s = loadSettings()
     chat.webContents.send(IPC.chatSettings, currentChatSettings())

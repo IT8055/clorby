@@ -63,6 +63,8 @@ export const IPC = {
   chatDeleteSession: 'chat:delete-session',
   chatRequestSnip: 'chat:request-snip',
   chatRequestAttach: 'chat:request-attach',
+  // Attach files the user dropped onto the chat window, by absolute path.
+  chatAttachPaths: 'chat:attach-paths',
   chatSetModel: 'chat:set-model',
   chatSetOled: 'chat:set-oled',
   chatMemoryRequest: 'chat:memory-request',
@@ -73,6 +75,7 @@ export const IPC = {
   chatSetAutostart: 'chat:set-autostart',
   chatSetHotkeys: 'chat:set-hotkeys',
   chatSetRetention: 'chat:set-retention',
+  chatSetAlwaysOnTop: 'chat:set-always-on-top',
 
   // snip overlay renderer to main
   snipSelect: 'snip:select',
