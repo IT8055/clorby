@@ -13,6 +13,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "doctor": "node scripts/doctor.mjs",
     "icons": "node scripts/make-icon.mjs",
+    "art": "node scripts/make-art.mjs",
     "package": "npm run build && electron-builder"
   },
   "dependencies": {
