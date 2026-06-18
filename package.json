@@ -12,6 +12,7 @@
     "build": "tsc -p tsconfig.json && electron-vite build",
     "typecheck": "tsc -p tsconfig.json",
     "doctor": "node scripts/doctor.mjs",
+    "icons": "node scripts/make-icon.mjs",
     "package": "npm run build && electron-builder"
   },
   "dependencies": {
