@@ -44,6 +44,7 @@ function defaults(): Settings {
     chatAlwaysOnTop: true,
     autostart: false,
     lastSessionId: null,
+    projectSessions: {},
     claudeExecutablePath: null
   }
 }
@@ -64,6 +65,7 @@ function withDefaults(partial: Partial<Settings>): Settings {
     chatAlwaysOnTop: partial.chatAlwaysOnTop ?? base.chatAlwaysOnTop,
     autostart: partial.autostart ?? base.autostart,
     lastSessionId: partial.lastSessionId ?? base.lastSessionId,
+    projectSessions: { ...base.projectSessions, ...(partial.projectSessions ?? {}) },
     claudeExecutablePath: partial.claudeExecutablePath ?? base.claudeExecutablePath
   }
 }

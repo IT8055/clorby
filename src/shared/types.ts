@@ -177,5 +177,8 @@ export interface Settings {
   // Launch Clorby when Windows starts.
   autostart: boolean
   lastSessionId: string | null
+  // Per-project session pointers (absolute folder path to SDK session id) so
+  // reopening a project resumes where it left off. See SPEC continuation.
+  projectSessions: Record<string, string>
   claudeExecutablePath: string | null
 }

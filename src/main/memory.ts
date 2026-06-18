@@ -7,7 +7,21 @@ import { dirname, join } from 'path'
 // stay small. The panel shows the count and warns when the file is over the cap.
 export const MEMORY_MAX_CHARS = 4000
 
+// The project-scoped memory file lives in the folder, so it travels with the
+// project and can be shared or committed. Filename is fixed by the continuation
+// feature.
+export const PROJECT_MEMORY_FILE = '.clorbymem.md'
+
+// When a project is open the active memory is its in-folder file; otherwise it
+// is the global file under the user data folder. Set by main on project change.
+let projectDir: string | null = null
+
+export function setMemoryProject(dir: string | null): void {
+  projectDir = dir
+}
+
 export function memoryPath(): string {
+  if (projectDir) return join(projectDir, PROJECT_MEMORY_FILE)
   return join(app.getPath('userData'), 'clorby-memory.md')
 }
 

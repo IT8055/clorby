@@ -622,6 +622,36 @@
       .workingbar.show {
         display: flex;
       }
+      .queuedbar {
+        display: none;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 8px 5px 12px;
+        font-size: 12px;
+        color: #7a7461;
+        background: #f3eedd;
+        border-top: 1px solid #e7dfc6;
+      }
+      .queuedbar.show {
+        display: flex;
+      }
+      .queuedbar .queuedlabel {
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .queuedbar .queuedcancel {
+        flex: 0 0 auto;
+        border: none;
+        background: #e0d8bf;
+        border-radius: 6px;
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+        color: #6b6655;
+      }
       .workingbar .workingdot {
         width: 8px;
         height: 8px;
@@ -771,6 +801,7 @@
       :root[data-theme='dark'] .footer,
       :root[data-theme='dark'] .snipchips,
       :root[data-theme='dark'] .workingbar,
+      :root[data-theme='dark'] .queuedbar,
       :root[data-theme='dark'] .memorybar {
         background: #26241f;
         border-color: #3a362d;
@@ -787,6 +818,7 @@
       :root[data-theme='dark'] .toolline,
       :root[data-theme='dark'] .toolline .dot,
       :root[data-theme='dark'] .workingbar,
+      :root[data-theme='dark'] .queuedbar,
       :root[data-theme='dark'] .hint,
       :root[data-theme='dark'] .meta,
       :root[data-theme='dark'] .field > .label,
@@ -839,7 +871,8 @@
         background: #3a362d;
         color: #ece6d6;
       }
-      :root[data-theme='dark'] .snipchip button {
+      :root[data-theme='dark'] .snipchip button,
+      :root[data-theme='dark'] .queuedbar .queuedcancel {
         background: #3a362d;
         color: #a59f8c;
       }
@@ -953,6 +986,9 @@
         <button class="winbtn" id="history" title="Past chats" aria-label="Past chats">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
         </button>
+        <button class="winbtn" id="export" title="Export chat as Markdown" aria-label="Export chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M8 11l4 4 4-4"/><path d="M5 20h14"/></svg>
+        </button>
         <button class="winbtn" id="new" title="New chat" aria-label="New chat">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
@@ -997,6 +1033,10 @@
     <div class="workingbar" id="workingbar">
       <span class="workingdot"></span>
       <span>Clorby is working...</span>
+    </div>
+    <div class="queuedbar" id="queuedbar">
+      <span class="queuedlabel" id="queuedtext"></span>
+      <button class="queuedcancel" id="queuedcancel" title="Cancel queued message" aria-label="Cancel queued message">&times;</button>
     </div>
     <div class="composer">
       <button class="cbtn" id="snip" title="Screen clip" aria-label="Screen clip">

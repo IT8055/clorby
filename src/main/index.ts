@@ -1,11 +1,13 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, screen, session, shell } from 'electron'
 import { watch } from 'fs'
+import type { FSWatcher } from 'fs'
 import { AgentService } from './agent'
 import { CursorPoller } from './cursor'
 import { registerShortcuts, unregisterShortcuts } from './shortcuts'
 import type { ShortcutHandlers } from './shortcuts'
 import { clampOrbPosition, clampOrbSize, loadSettings, saveOrbPosition, updateSettings } from './settings'
-import { ensureMemoryFile, memoryPath, readMemory, writeMemory } from './memory'
+import { ensureMemoryFile, memoryPath, readMemory, setMemoryProject, writeMemory } from './memory'
+import { formatTranscriptMarkdown, projectChatPath, readProjectChat, writeTextFile } from './transcript'
 import { attachFromFile, cleanupOldSnips, startSnip, wireSnipIpc } from './snip'
 import { createTray, destroyTray, revealSettingsFile } from './tray'
 import { createChatWindow, createOrbWindow, getChatWindow, getOrbWindow } from './windows'
@@ -206,6 +208,8 @@ const agent = new AgentService(
     onFinal: (text, stopped) => {
       setBusy(false)
       sendToChat(IPC.chatFinal, { text, stopped })
+      // Keep the in-folder chat log up to date when a project is open.
+      void persistProjectChat()
       if (stopped) {
         clearExpressionTimer()
         settleFace()
@@ -344,14 +348,45 @@ function pushMemory(): void {
 
 // Coalesce rapid file change events (an editor save can fire several).
 let memoryWatchTimer: ReturnType<typeof setTimeout> | null = null
+let memoryWatcher: FSWatcher | null = null
+// Watch whichever memory file is active now (global, or a project's .clorbymem.md).
+// Re-armed whenever the active project changes so edits to the right file show.
 function watchMemoryFile(): void {
+  if (memoryWatcher) {
+    memoryWatcher.close()
+    memoryWatcher = null
+  }
   try {
-    watch(memoryPath(), { persistent: false }, () => {
+    memoryWatcher = watch(memoryPath(), { persistent: false }, () => {
       if (memoryWatchTimer) clearTimeout(memoryWatchTimer)
       memoryWatchTimer = setTimeout(pushMemory, 150)
     })
   } catch {
     // Watching is best effort; the panel still updates on save and on Clorby's writes.
+  }
+}
+
+// Point memory at a project's in-folder file (or back to the global file), make
+// sure it exists so the panel and watcher have something to read, re-arm the
+// watcher, and refresh the panel.
+function switchMemoryTo(projectDir: string | null): void {
+  setMemoryProject(projectDir)
+  ensureMemoryFile()
+  watchMemoryFile()
+  pushMemory()
+}
+
+// Write the in-folder chat log for the open project, so the conversation can be
+// reopened (or moved) with the folder. Best effort: a failure never breaks a turn.
+async function persistProjectChat(): Promise<void> {
+  const dir = agent.projectPath
+  if (!dir) return
+  try {
+    const messages = await agent.currentTranscript()
+    if (messages.length === 0) return
+    writeTextFile(projectChatPath(dir), formatTranscriptMarkdown(messages, 'Clorby chat'))
+  } catch {
+    // The log is a convenience mirror; the session itself is the source of truth.
   }
 }
 
@@ -361,10 +396,60 @@ async function chooseProject(): Promise<void> {
     properties: ['openDirectory']
   })
   if (result.canceled || result.filePaths.length === 0) return
+  await openProject(result.filePaths[0])
+}
+
+// Open a project folder and continue where it left off: point memory at the
+// folder's .clorbymem.md, resume its last session and show it. If that session
+// is not on this machine, fall back to showing the saved .clorbychat.md log.
+async function openProject(dir: string): Promise<void> {
   pendingAttachments = []
-  agent.setProject(result.filePaths[0])
-  sendToChat(IPC.chatSessionCleared)
+  agent.setProject(dir)
+  switchMemoryTo(dir)
+  const messages = await agent.restoreMessages()
+  if (messages.length > 0) {
+    sendToChat(IPC.chatHistoryLoaded, { title: 'Project chat', messages })
+  } else {
+    const log = readProjectChat(dir)
+    if (log && log.trim().length > 0) {
+      sendToChat(IPC.chatHistoryLoaded, {
+        title: 'Continued chat',
+        messages: [{ role: 'assistant', text: `_Continued from .clorbychat.md_\n\n${log}` }]
+      })
+    } else {
+      sendToChat(IPC.chatSessionCleared)
+    }
+  }
   pushProjectState()
+  settleFace()
+}
+
+function timestampForFile(): string {
+  return new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')
+}
+
+// Export the current conversation to a Markdown file the user chooses.
+async function doExportChat(): Promise<void> {
+  const messages = await agent.currentTranscript()
+  if (messages.length === 0) {
+    void dialog.showMessageBox({
+      type: 'info',
+      message: 'Nothing to export yet.',
+      detail: 'Have a chat with Clorby first, then export it.'
+    })
+    return
+  }
+  const result = await dialog.showSaveDialog({
+    title: 'Export chat as Markdown',
+    defaultPath: `clorby-chat-${timestampForFile()}.md`,
+    filters: [{ name: 'Markdown', extensions: ['md'] }]
+  })
+  if (result.canceled || !result.filePath) return
+  try {
+    writeTextFile(result.filePath, formatTranscriptMarkdown(messages, 'Clorby chat'))
+  } catch (err) {
+    void dialog.showMessageBox({ type: 'error', message: 'Could not save the export.', detail: String(err) })
+  }
 }
 
 // Begin or refresh the OLED orbit around the current home position. The home is
@@ -739,6 +824,7 @@ function wireIpc(): void {
   ipcMain.on(IPC.chatClearProject, () => {
     pendingAttachments = []
     agent.setProject(null)
+    switchMemoryTo(null)
     sendToChat(IPC.chatSessionCleared)
     pushProjectState()
   })
@@ -758,6 +844,8 @@ function wireIpc(): void {
       .then((list) => sendToChat(IPC.chatHistoryList, list))
       .catch((err) => console.warn(`Clorby could not delete that chat: ${String(err)}`))
   })
+
+  ipcMain.on(IPC.chatExport, () => void doExportChat())
 
   ipcMain.on(IPC.chatHistoryRequest, () => {
     agent

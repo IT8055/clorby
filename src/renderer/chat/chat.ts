@@ -69,6 +69,9 @@ const hkTalk = el<HTMLInputElement>('hktalk')
 const hkSave = el<HTMLButtonElement>('hksave')
 const hkNote = el<HTMLSpanElement>('hknote')
 const retentionSelect = el<HTMLSelectElement>('retentionselect')
+const queuedBar = el<HTMLDivElement>('queuedbar')
+const queuedLabel = el<HTMLSpanElement>('queuedtext')
+const queuedCancel = el<HTMLButtonElement>('queuedcancel')
 
 // Defaults for the reset-to-default buttons, kept in step with settings.ts.
 const DEFAULT_HOTKEYS = {
@@ -87,6 +90,9 @@ let speakEnabled = localStorage.getItem('clorby.voice') === 'on'
 // as a removable chip; all ride along when the message is sent.
 const attachments: SnipResult[] = []
 let streaming = false
+// A message typed while Clorby is busy waits here and sends automatically when
+// the current turn finishes. The Stop button remains the way to interrupt.
+let queued: string | null = null
 // The assistant turn can interleave text bubbles, tool lines and permission
 // cards, so text accumulates into a "current" bubble that is finalised whenever
 // a tool or a permission interrupts it.
@@ -324,11 +330,13 @@ function addMessage(role: 'user' | 'assistant'): HTMLDivElement {
 
 function setComposerBusy(busy: boolean): void {
   streaming = busy
-  input.disabled = busy
+  // The input stays usable while Clorby is busy so you can type ahead; pressing
+  // Enter queues the message instead of being ignored.
   sendButton.style.display = busy ? 'none' : ''
   stopButton.style.display = busy ? '' : 'none'
   workingBar.classList.toggle('show', busy)
-  if (!busy) input.focus()
+  input.placeholder = busy ? 'Type your next message; it sends when Clorby is done' : 'Message Clorby'
+  input.focus()
 }
 
 function autosize(): void {
@@ -369,10 +377,9 @@ function renderDiff(detail: string): HTMLPreElement {
   return pre
 }
 
-function send(): void {
-  const text = input.value.trim()
-  if (text.length === 0 || streaming) return
-
+// Actually start a turn: render the user bubble (with any attachments), show the
+// typing placeholder, and hand the text to main.
+function performSend(text: string): void {
   removeHint()
 
   const userBubble = addMessage('user').firstElementChild as HTMLDivElement
@@ -399,12 +406,46 @@ function send(): void {
   ;(pending.firstElementChild as HTMLDivElement).innerHTML = TYPING
   turnPending = pending
 
-  input.value = ''
-  autosize()
   setComposerBusy(true)
   stopSpeaking()
   bridge.send(text)
 }
+
+function showQueued(): void {
+  if (!queued) return
+  queuedLabel.textContent = `Queued: ${queued.replace(/\s+/g, ' ').trim()}`
+  queuedBar.classList.add('show')
+}
+
+function clearQueued(): void {
+  queued = null
+  queuedBar.classList.remove('show')
+}
+
+// Send whatever is queued, if anything. Called when a turn finishes so the
+// typed-ahead message goes out on its own.
+function flushQueued(): void {
+  if (!queued) return
+  const text = queued
+  clearQueued()
+  performSend(text)
+}
+
+function send(): void {
+  const text = input.value.trim()
+  if (text.length === 0) return
+  input.value = ''
+  autosize()
+  if (streaming) {
+    // Clorby is mid-reply: hold this message and send it when the turn ends.
+    queued = queued ? `${queued}\n${text}` : text
+    showQueued()
+    return
+  }
+  performSend(text)
+}
+
+queuedCancel.addEventListener('click', clearQueued)
 
 // Streamed turn events.
 
@@ -513,6 +554,8 @@ bridge.onFinal((final: ChatFinal) => {
   finalizeBubble()
   setComposerBusy(false)
   scrollToBottom()
+  // A message typed while Clorby was replying now goes out on its own.
+  flushQueued()
 })
 
 bridge.onError((error: ChatError) => {
@@ -534,6 +577,12 @@ bridge.onError((error: ChatError) => {
   }
   setComposerBusy(false)
   scrollToBottom()
+  // Do not auto-send into an error: hand the queued text back to the box.
+  if (queued) {
+    input.value = input.value.trim().length > 0 ? `${queued}\n${input.value}` : queued
+    clearQueued()
+    autosize()
+  }
 })
 
 bridge.onSessionCleared(() => {
@@ -547,6 +596,7 @@ bridge.onSessionCleared(() => {
   finalizeBubble()
   turnPending = null
   clearSnipChip()
+  clearQueued()
   setComposerBusy(false)
 })
 
@@ -770,6 +820,7 @@ bridge.onHistoryLoaded((loaded: HistoryLoaded) => {
   finalizeBubble()
   turnPending = null
   clearSnipChip()
+  clearQueued()
   setComposerBusy(false)
   scrollToBottom()
 })
@@ -859,6 +910,7 @@ el<HTMLButtonElement>('settingsback').addEventListener('click', () => {
   settingsView.style.display = 'none'
 })
 el<HTMLButtonElement>('history').addEventListener('click', openHistory)
+el<HTMLButtonElement>('export').addEventListener('click', () => bridge.exportChat())
 el<HTMLButtonElement>('historyback').addEventListener('click', () => {
   historyView.style.display = 'none'
 })

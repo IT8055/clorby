@@ -82,9 +82,11 @@ The chat (phase 2):
 - Type a message and press Enter (Shift+Enter for a new line) or click Send. Clorby streams the reply token by token with markdown.
 - The orb reacts: thinking before the first word, a busy "working" face with eyes scanning while it runs tools, talking while streaming, a happy flash on success, a brief confused tilt when it is blocked from a tool, and a worried face on a real error.
 - While Clorby is working on a reply it shows a small activity ring and stops following your mouse, and the chat shows a "Clorby is working..." line. Both clear when the reply finishes.
-- Stop interrupts a reply cleanly and keeps whatever arrived so far, marked as stopped.
-- The panel header has small icon buttons: Settings, History, New chat, Minimise, and Close.
+- You can keep typing while Clorby is replying. Press Enter and your message is queued (a "Queued" line appears with an x to cancel) and sent automatically the moment the current reply finishes. Attachments you add in the meantime ride along with it.
+- Stop interrupts a reply cleanly and keeps whatever arrived so far, marked as stopped. Interrupting never loses the conversation: the thread and its context are kept, so you can carry straight on.
+- The panel header has small icon buttons: Settings, History, Export chat, New chat, Minimise, and Close.
 - New chat starts a fresh conversation. To pick up a previous one, open History.
+- Export chat (the download icon in the header) saves the current conversation to a Markdown file you choose.
 - History lists your past Clorby chats by title and date. Click one to reopen it (the earlier messages are shown and you can carry on), or use the bin icon to delete it. The list shows only Clorby's own chats, not your terminal Claude Code sessions.
 - Settings (the sliders icon) holds the model choice, a Light or Dark theme for the panel, a "Keep chat window on top" toggle, the orb size slider, voice on/off plus voice and speed, the microphone picker, OLED safe mode, a Start with Windows toggle, editable shortcuts, and how long to keep snips. The "Keep chat window on top" toggle is on by default (the panel floats above other windows); turn it off to let the panel sit behind whatever you are working in. Each shortcut has a short description of what it does; click its box and press the keys to change it, or use Reset, then Save. Changing the shortcuts re-registers them at once and tells you if one is already taken.
 - The message box has icon buttons to take screen clips and to attach files, alongside the Talk (microphone) button. You can queue several at once: each shows as a chip with its own remove button, and they all ride along with your next message. Hold the Talk button to record (or hold the orb itself, or press the global talk shortcut, default Ctrl+Alt+V).
@@ -97,6 +99,7 @@ The chat (phase 2):
 Code review (phase 4):
 
 - In Settings, choose a project folder. A bar appears at the bottom of the panel with the project name and a clear Review / Act switch.
+- Continuation: while a project is open, Clorby keeps its memory and the conversation in the folder itself, as .clorbymem.md and .clorbychat.md. Reopen the folder later and it loads both, resuming the same conversation so you carry on where you left off (if that session is not on this machine, for example after moving the folder, it shows the saved chat for reference and starts fresh). The .clorbymem.md notes are what Clorby remembers for that project, separate from the global memory used in general chat. You may want to add both files to the project's .gitignore.
 - Review mode is read-only: Clorby can read, search and list files in the project to answer questions, and cites file paths. It cannot change anything.
 - If you ask for a change while in Review mode, Clorby shows a one-click "Switch to Act mode" card in the chat, so you are never stuck. Click it (or the Act side of the toggle in the project bar) and ask again.
 - Act mode can edit files, but every change is shown as a diff and needs your approval: Allow once, Allow for this session, or Deny. While a card is waiting, the orb pulls its asking face.
@@ -117,7 +120,7 @@ Memory (phase 6):
 - A collapsible Memory section sits at the top of the chat panel. Click the "Memory" header to expand it. Inside are the notes Clorby keeps across conversations, an editable text box, Save, and Open file.
 - The notes are read by Clorby at the start of every reply, so it remembers your preferences, facts about you, and decisions from one chat to the next. Keep them short, one note per line.
 - Both you and Clorby can edit the memory. When you tell Clorby something worth keeping, it can update the file itself: the change shows as a quiet "Updated its memory" line in the chat and the panel refreshes. Nothing is saved silently.
-- The file on disk is the source of truth (clorby-memory.md in your user data folder). Open file opens it in your editor; edits there refresh the panel too. If you have unsaved edits in the panel, an update from Clorby will not overwrite them.
+- The file on disk is the source of truth: clorby-memory.md in your user data folder for general chat, or .clorbymem.md in the folder when a project is open. Open file opens it in your editor; edits there refresh the panel too. If you have unsaved edits in the panel, an update from Clorby will not overwrite them.
 - Memory rides in every request, so keep it small. The panel shows a character count and warns when you are over the limit. Do not store secrets in it.
 
 ## Developer expression test

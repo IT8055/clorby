@@ -295,11 +295,62 @@ export class AgentService {
     return this.project ?? app.getPath('userData')
   }
 
+  get projectPath(): string | null {
+    return this.project
+  }
+
   setProject(path: string | null): void {
     this.project = path
     this.mode = 'review'
     this.sessionAllow.clear()
-    this.newSession()
+    if (path) {
+      // Resume the project's last session if a pointer to it is stored; whether
+      // it still exists on this machine is settled by restoreMessages, which
+      // drops the pointer and falls back to show-only when it cannot be read.
+      this.sessionId = this.getSettings().projectSessions[path] ?? null
+    } else {
+      this.newSession()
+    }
+  }
+
+  // Capture the live session id everywhere it belongs: as the resume target, as
+  // the global last session, and (with a project open) as that project's pointer
+  // so reopening the folder continues the same conversation.
+  private rememberSession(id: string): void {
+    this.sessionId = id
+    updateSettings({ lastSessionId: id })
+    if (this.project) {
+      updateSettings({ projectSessions: { ...this.getSettings().projectSessions, [this.project]: id } })
+    }
+  }
+
+  private mapMessages(raw: SessionMessage[]): HistoryMessage[] {
+    return raw
+      .filter((m) => m.type === 'user' || m.type === 'assistant')
+      .map((m) => ({ role: m.type === 'assistant' ? 'assistant' : 'user', text: messageText(m) }) as HistoryMessage)
+      .filter((m) => m.text.trim().length > 0)
+  }
+
+  // The displayable messages of the current session, for export and for writing
+  // the in-folder chat log. Empty (rather than throwing) when there is nothing.
+  async currentTranscript(): Promise<HistoryMessage[]> {
+    if (!this.sessionId) return []
+    try {
+      const sdk = await loadSdk()
+      const raw = await sdk.getSessionMessages(this.sessionId, { dir: this.sessionsDir() })
+      return this.mapMessages(raw)
+    } catch {
+      return []
+    }
+  }
+
+  // Restore the conversation when reopening a project. Reads the resumed
+  // session's messages; if it cannot (no session on this machine), drops the
+  // pointer so the next turn starts fresh and the caller can show the log file.
+  async restoreMessages(): Promise<HistoryMessage[]> {
+    const messages = await this.currentTranscript()
+    if (messages.length === 0) this.sessionId = null
+    return messages
   }
 
   setMode(mode: ReviewMode): void {
@@ -454,12 +505,8 @@ export class AgentService {
   async openSession(sessionId: string): Promise<HistoryMessage[]> {
     const sdk = await loadSdk()
     const raw = await sdk.getSessionMessages(sessionId, { dir: this.sessionsDir() })
-    this.sessionId = sessionId
-    updateSettings({ lastSessionId: sessionId })
-    return raw
-      .filter((m) => m.type === 'user' || m.type === 'assistant')
-      .map((m) => ({ role: m.type === 'assistant' ? 'assistant' : 'user', text: messageText(m) }) as HistoryMessage)
-      .filter((m) => m.text.trim().length > 0)
+    this.rememberSession(sessionId)
+    return this.mapMessages(raw)
   }
 
   async deleteSession(sessionId: string): Promise<void> {
@@ -474,6 +521,13 @@ export class AgentService {
   newSession(): void {
     this.sessionId = null
     updateSettings({ lastSessionId: null })
+    // A deliberate fresh start in a project drops its resume pointer too, so
+    // "New chat" means new even after the folder is reopened.
+    if (this.project) {
+      const map = { ...this.getSettings().projectSessions }
+      delete map[this.project]
+      updateSettings({ projectSessions: map })
+    }
   }
 
   async stop(): Promise<void> {
@@ -555,9 +609,8 @@ export class AgentService {
 
       for await (const msg of stream) {
         if (msg.type === 'system' && msg.subtype === 'init') {
-          this.sessionId = msg.session_id
+          this.rememberSession(msg.session_id)
           this.model = msg.model
-          updateSettings({ lastSessionId: msg.session_id })
           // The subscription path reports 'none' (no key) or 'oauth' (login).
           // Anything else ('user', 'project', 'org', 'temporary') is an API key.
           // The runtime value 'none' is absent from the SDK's published union,

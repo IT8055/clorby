@@ -60,6 +60,7 @@ export const IPC = {
   chatClearSnip: 'chat:clear-snip',
   chatHistoryRequest: 'chat:history-request',
   chatHistoryOpen: 'chat:history-open',
+  chatExport: 'chat:export',
   chatDeleteSession: 'chat:delete-session',
   chatRequestSnip: 'chat:request-snip',
   chatRequestAttach: 'chat:request-attach',

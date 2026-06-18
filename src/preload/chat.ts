@@ -114,6 +114,9 @@ const bridge = {
   deleteSession(sessionId: string): void {
     ipcRenderer.send(IPC.chatDeleteSession, sessionId)
   },
+  exportChat(): void {
+    ipcRenderer.send(IPC.chatExport)
+  },
   requestSnip(): void {
     ipcRenderer.send(IPC.chatRequestSnip)
   },
