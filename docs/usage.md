@@ -28,11 +28,12 @@ A tour of what the orb and the chat panel can do. For project code review see
 
 - Type a message and press Enter (Shift+Enter for a new line) or click Send. Clorby streams the reply token by token, with Markdown.
 - The orb reacts as it works: thinking before the first word, a busy "working" face while it runs tools, talking while streaming, a happy flash on success, a brief confused tilt when it is blocked from a tool, and a worried face on a real error.
-- While Clorby is working it shows a small activity ring and stops following your mouse, and the chat shows a "Clorby is working..." line. Both clear when the reply finishes.
+- While Clorby is working it shows a small activity ring and stops following your mouse, and the chat shows a working bar with a rotating status word (Thinking, Pondering, Cogitating, and so on) so you can see it is still going even on a slow turn. Both clear when the reply finishes, and a soft chime plays when it is done (mute it in Settings).
 - You can keep typing while Clorby is replying. Press Enter and your message is queued (a "Queued" line appears, with an x to cancel) and sent automatically the moment the current reply finishes. Attachments you add in the meantime ride along with it.
 - Stop interrupts a reply cleanly and keeps whatever arrived so far. Interrupting never loses the conversation: the thread and its context are kept, so you can carry straight on.
 - Links in replies open in your real browser, and only over https.
-- The footer shows the model and where billing goes: "Subscription" (your Claude plan, the normal case) or "API key". If an API key is detected, a warning banner also appears, because that bills the API rather than your plan.
+- The footer shows the model on the left, a running token count for the chat (sent / received) in the middle, and where billing goes on the right: "Subscription" (your Claude plan, the normal case) or "API key". If an API key is detected, a warning banner also appears, because that bills the API rather than your plan.
+- When a chat grows very long, Clorby shows a gentle note offering a new chat: a long thread is replayed in full every turn, so it gets slower and costs more, and your memory carries across chats anyway.
 
 The panel header has small icon buttons: Settings, History, Export chat, New chat, Minimise, and Close.
 
@@ -82,7 +83,9 @@ Voice is entirely local. Audio never leaves your machine.
   <img src="images/settings.png" alt="The Clorby Settings panel" width="420">
 </p>
 
-- Settings (the sliders icon) holds the model choice, a Light or Dark theme for the panel, a "Keep chat window on top" toggle, the orb size slider, voice on/off plus voice and speed, the microphone picker, OLED safe mode, a Start with Windows toggle, editable shortcuts, and how long to keep snips.
+- Settings (the sliders icon) holds the model choice, a Light or Dark theme for the panel, a "Keep chat window on top" toggle, the orb size slider, voice on/off plus voice and speed, the microphone picker, a "Play sounds" toggle for the cues, OLED safe mode, a Start with Windows toggle, editable shortcuts, how long to keep snips, and phone notifications (ntfy).
+- "Play sounds" controls the subtle cues: a soft chime when Clorby finishes, a low blip on an error, and a gentle tone when it asks permission. Turn it off for silence.
+- Phone notifications use ntfy and are off by default. Install the free ntfy app, subscribe to a private topic name, enter that topic (and a server, ntfy.sh by default) in Settings, and tick Enable. Clorby then pings your phone when a long task finishes, errors, or needs permission while its window is not focused. See [Privacy and security](privacy.md) for what is sent.
 - "Keep chat window on top" is on by default (the panel floats above other windows); turn it off to let the panel sit behind whatever you are working in.
 - OLED safe mode makes the orb drift very slowly around its spot so it never lights the same pixels for long. The drift travels a little further than the orb's own width and height, scales with the orb size, and stays on screen, which means in this mode the orb rests slightly in from a corner. It is meant for OLED screens, where a static bright image can cause burn-in. Turn it off to keep the orb perfectly still.
 - Settings live in a plain settings.json under your user data folder (on Windows, `%APPDATA%\clorby\settings.json`). Use the tray item to reveal it in Explorer.

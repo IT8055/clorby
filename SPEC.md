@@ -371,7 +371,7 @@ Build: agent service per section 11, streaming chat UI with markdown, status-dri
 - [x] Light and dark theme for the chat panel
 - [x] Orb right-click menu trimmed to global actions (Chat, Snip, Hide, Quit); chat actions and settings live in the chat window, not duplicated
 - [x] Installer builds and installs cleanly; app icon and tray icon final
-- [ ] Expression pass: transitions tuned, optional subtle sounds behind a setting
+- [x] Expression pass: transitions tuned, optional subtle sounds behind a setting
 
 ### Phase 6: memory
 
@@ -381,8 +381,8 @@ Build: cross-session memory per section 19. A collapsible Memory panel in the ch
 - [ ] The memory file is injected into the system prompt each turn, so Clorby recalls it without a tool call
 - [ ] Clorby can update the memory file itself via the Write tool, confined to that one file, with no permission card, and each change shows as a quiet transcript line and refreshes the panel
 - [ ] Writes outside the memory file still require a project in Act mode and a permission card; reads stay confined as before
-- [ ] External edits and Clorby's writes refresh the panel, except when the user has unsaved edits focused
-- [ ] The memory slice is capped for the prompt; the panel shows the count and warns when over
+- [x] External edits and Clorby's writes refresh the panel, except when the user has unsaved edits focused
+- [x] The memory slice is capped for the prompt; the panel shows the count and warns when over
 
 ### Phase 7: liveliness and voice
 
@@ -438,3 +438,7 @@ The rule: transcribed text always lands in the chat input for the user to read a
 IPC: main to chat carries voice-start and voice-stop; the renderer owns the recorder and writes the result into the input itself, so no transcript round-trips through main.
 
 OLED drift (revises section 10's oledSafe): the drift amplitude is derived from the orb size so peak-to-peak travel exceeds the full orb width and height, clearing both the body and the faint glow. The orbit centre is clamped inward from the work-area edges so the whole wander stays on-screen, which means in OLED mode Clorby rests slightly in from a corner. The slow ten-minute cycle is unchanged, so the motion stays barely perceptible.
+
+## 21. Notifications (opt-in, added after phase 5)
+
+ntfy push notifications, off by default. The original stance was no network calls beyond the Agent SDK; this is a deliberate, owner-approved exception, kept deliberately narrow. When the user enables it in Settings and gives a topic name (and optionally a self-hosted server, ntfy.sh by default), main posts a short message to that ntfy topic on three events: a turn finishing after running at least twenty seconds, a turn erroring, and Clorby needing a permission decision. All three fire only while the chat window is not focused (you are away from the desktop). The POST happens in main (never a renderer), is best effort with a five second timeout, and never blocks or fails a turn. The message is a title plus a short snippet of the reply; the privacy note warns that on the public server this passes through a third party, so the topic should be private and self-hosting is the way to keep everything on your own network. See src/main/notify.ts and section 16's notes; the alongside "play sounds" cues (chime on finish, blip on error, tone on a permission ask) are local only and need no network.

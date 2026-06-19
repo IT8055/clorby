@@ -13,8 +13,8 @@ looking. Snip anything on screen and ask about it, drop a file on it, or point
 it at a project folder for code review.
 
 It runs on your own Claude subscription through the Claude Agent SDK. No API
-keys to manage, no telemetry, and nothing leaves your machine except the model
-calls themselves.
+keys to manage and no telemetry; nothing leaves your machine except the model
+calls themselves, plus optional phone notifications if you switch them on.
 
 <p align="center">
   <img src="docs/images/chat.png" alt="The Clorby chat panel reviewing a project, with the orb floating above it" width="440">
@@ -30,6 +30,7 @@ calls themselves.
 - **Memory**: it keeps short notes across chats, and a separate memory per project.
 - **Continuation**: reopen a project and pick up the same conversation.
 - **Export**: save any chat to Markdown.
+- **Notifications**: optionally ping your phone (via ntfy) when a long task finishes, errors, or needs you.
 
 The full tour is in the [usage guide](docs/usage.md).
 

@@ -52,6 +52,6 @@ Gary creates the empty GitHub repository (account IT8055) in the browser; you ha
 ## Do not
 
 - Do not implement future phases early
-- Do not add telemetry, analytics, auto-update, or network calls beyond the Agent SDK
+- Do not add telemetry, analytics, or auto-update. Beyond the Agent SDK, the only allowed network calls are the one-time local Whisper model download and the opt-in ntfy notifications (off by default, user-configured server and topic). Do not add other network calls without asking.
 - Do not expose Node or the SDK to any renderer
 - Do not weaken any security setting to make something easier

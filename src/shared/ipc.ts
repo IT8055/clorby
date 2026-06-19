@@ -77,6 +77,7 @@ export const IPC = {
   chatSetHotkeys: 'chat:set-hotkeys',
   chatSetRetention: 'chat:set-retention',
   chatSetAlwaysOnTop: 'chat:set-always-on-top',
+  chatSetNtfy: 'chat:set-ntfy',
 
   // snip overlay renderer to main
   snipSelect: 'snip:select',

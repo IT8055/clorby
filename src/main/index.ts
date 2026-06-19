@@ -6,6 +6,7 @@ import { CursorPoller } from './cursor'
 import { registerShortcuts, unregisterShortcuts } from './shortcuts'
 import type { ShortcutHandlers } from './shortcuts'
 import { clampOrbPosition, clampOrbSize, loadSettings, saveOrbPosition, updateSettings } from './settings'
+import { sendNotification } from './notify'
 import { ensureMemoryFile, memoryPath, readMemory, setMemoryProject, writeMemory } from './memory'
 import { formatTranscriptMarkdown, projectChatPath, readProjectChat, writeTextFile } from './transcript'
 import { attachFromFile, cleanupOldSnips, startSnip, wireSnipIpc } from './snip'
@@ -142,8 +143,10 @@ function flashConfused(): void {
 function onAgentStatus(status: ChatStatus): void {
   sendToChat(IPC.chatStatus, status)
   if (status === 'thinking') {
-    // A turn is starting: mark busy and reset the per-turn act-card guard.
+    // A turn is starting: mark busy, stamp the start (for the notify gate) and
+    // reset the per-turn act-card guard.
     setBusy(true)
+    turnStartedAt = Date.now()
     actCardShownThisTurn = false
     clearExpressionTimer()
     setExpression('thinking')
@@ -166,6 +169,22 @@ let permissionCounter = 0
 function clearPendingPermissions(): void {
   for (const resolve of pendingPermissions.values()) resolve('deny')
   pendingPermissions.clear()
+}
+
+// ntfy is pushed only when the chat window is not focused (you are away from
+// the desktop). A completion ping fires only when the turn ran long enough to be
+// worth interrupting you for; errors and permission requests always ping while
+// away, since both need you to come back.
+const NOTIFY_MIN_MS = 20000
+let turnStartedAt = 0
+function chatIsAway(): boolean {
+  const chat = getChatWindow()
+  return !chat || chat.isDestroyed() || !chat.isFocused()
+}
+function notifySnippet(text: string): string {
+  const s = text.replace(/\s+/g, ' ').trim()
+  if (s.length === 0) return 'Your task is done.'
+  return s.length > 160 ? `${s.slice(0, 159)}…` : s
 }
 
 const agent = new AgentService(
@@ -211,12 +230,17 @@ const agent = new AgentService(
         clearExpressionTimer()
         setExpression('asking')
         sendToChat(IPC.chatPermissionRequest, { id, ...request })
+        if (chatIsAway()) void sendNotification('Clorby needs permission', request.title, 'lock')
       }),
     onFinal: (text, stopped) => {
       setBusy(false)
       sendToChat(IPC.chatFinal, { text, stopped })
       // Keep the in-folder chat log up to date when a project is open.
       void persistProjectChat()
+      // Ping the phone when a long turn finishes and you are not at the window.
+      if (!stopped && Date.now() - turnStartedAt >= NOTIFY_MIN_MS && chatIsAway()) {
+        void sendNotification('Clorby is done', notifySnippet(text), 'white_check_mark')
+      }
       if (stopped) {
         clearExpressionTimer()
         settleFace()
@@ -235,6 +259,7 @@ const agent = new AgentService(
       sendToChat(IPC.chatError, error)
       clearExpressionTimer()
       setExpression('error')
+      if (chatIsAway()) void sendNotification('Clorby hit a snag', error.message, 'warning')
     },
     onStatus: onAgentStatus
   },
@@ -335,7 +360,10 @@ function currentChatSettings(): ChatSettings {
     toggleChatHotkey: s.hotkeys.toggleChat,
     snipHotkey: s.hotkeys.snip,
     talkHotkey: s.hotkeys.talk,
-    chatAlwaysOnTop: s.chatAlwaysOnTop
+    chatAlwaysOnTop: s.chatAlwaysOnTop,
+    ntfyEnabled: s.ntfy.enabled,
+    ntfyServer: s.ntfy.server,
+    ntfyTopic: s.ntfy.topic
   }
 }
 
@@ -795,6 +823,22 @@ function wireIpc(): void {
   })
   ipcMain.on(IPC.chatSetTheme, (_event, theme: Theme) => setTheme(theme === 'dark' ? 'dark' : 'light'))
   ipcMain.on(IPC.chatSetAlwaysOnTop, (_event, on: boolean) => setChatAlwaysOnTop(Boolean(on)))
+  ipcMain.on(
+    IPC.chatSetNtfy,
+    (_event, payload: { enabled: boolean; server: string; topic: string }) => {
+      if (
+        payload &&
+        typeof payload.enabled === 'boolean' &&
+        typeof payload.server === 'string' &&
+        typeof payload.topic === 'string'
+      ) {
+        updateSettings({
+          ntfy: { enabled: payload.enabled, server: payload.server.trim(), topic: payload.topic.trim() }
+        })
+        pushChatSettings()
+      }
+    }
+  )
   ipcMain.on(IPC.chatSetAutostart, (_event, on: boolean) => setAutostart(Boolean(on)))
   ipcMain.on(IPC.chatSetRetention, (_event, days: number) => {
     if (typeof days === 'number') setRetention(days)

@@ -146,6 +146,9 @@ const bridge = {
   setAlwaysOnTop(enabled: boolean): void {
     ipcRenderer.send(IPC.chatSetAlwaysOnTop, enabled)
   },
+  setNtfy(enabled: boolean, server: string, topic: string): void {
+    ipcRenderer.send(IPC.chatSetNtfy, { enabled, server, topic })
+  },
   setAutostart(enabled: boolean): void {
     ipcRenderer.send(IPC.chatSetAutostart, enabled)
   },

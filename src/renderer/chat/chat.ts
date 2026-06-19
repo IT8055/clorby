@@ -73,6 +73,9 @@ const hkTalk = el<HTMLInputElement>('hktalk')
 const hkSave = el<HTMLButtonElement>('hksave')
 const hkNote = el<HTMLSpanElement>('hknote')
 const retentionSelect = el<HTMLSelectElement>('retentionselect')
+const ntfyToggle = el<HTMLInputElement>('ntfytoggle')
+const ntfyServer = el<HTMLInputElement>('ntfyserver')
+const ntfyTopic = el<HTMLInputElement>('ntfytopic')
 const queuedBar = el<HTMLDivElement>('queuedbar')
 const queuedLabel = el<HTMLSpanElement>('queuedtext')
 const queuedCancel = el<HTMLButtonElement>('queuedcancel')
@@ -297,6 +300,13 @@ orbSizeRange.addEventListener('input', () => {
 })
 autostartToggle.addEventListener('change', () => bridge.setAutostart(autostartToggle.checked))
 retentionSelect.addEventListener('change', () => bridge.setRetention(Number(retentionSelect.value)))
+// 'change' (not 'input') so settings persist on blur or Enter, not per keystroke.
+function pushNtfy(): void {
+  bridge.setNtfy(ntfyToggle.checked, ntfyServer.value.trim(), ntfyTopic.value.trim())
+}
+ntfyToggle.addEventListener('change', pushNtfy)
+ntfyServer.addEventListener('change', pushNtfy)
+ntfyTopic.addEventListener('change', pushNtfy)
 
 // Turn a keydown into an Electron accelerator string. Returns null for a
 // modifier-only press so the field waits for a real key.
@@ -390,6 +400,9 @@ bridge.onSettings((settings: ChatSettings) => {
   if (document.activeElement !== hkChat) hkChat.value = settings.toggleChatHotkey
   if (document.activeElement !== hkSnip) hkSnip.value = settings.snipHotkey
   if (document.activeElement !== hkTalk) hkTalk.value = settings.talkHotkey
+  ntfyToggle.checked = settings.ntfyEnabled
+  if (document.activeElement !== ntfyServer) ntfyServer.value = settings.ntfyServer
+  if (document.activeElement !== ntfyTopic) ntfyTopic.value = settings.ntfyTopic
 })
 
 // Voice output (local speech synthesis).

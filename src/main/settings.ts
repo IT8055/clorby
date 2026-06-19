@@ -45,7 +45,8 @@ function defaults(): Settings {
     autostart: false,
     lastSessionId: null,
     projectSessions: {},
-    claudeExecutablePath: null
+    claudeExecutablePath: null,
+    ntfy: { enabled: false, server: 'https://ntfy.sh', topic: '' }
   }
 }
 
@@ -66,7 +67,8 @@ function withDefaults(partial: Partial<Settings>): Settings {
     autostart: partial.autostart ?? base.autostart,
     lastSessionId: partial.lastSessionId ?? base.lastSessionId,
     projectSessions: { ...base.projectSessions, ...(partial.projectSessions ?? {}) },
-    claudeExecutablePath: partial.claudeExecutablePath ?? base.claudeExecutablePath
+    claudeExecutablePath: partial.claudeExecutablePath ?? base.claudeExecutablePath,
+    ntfy: { ...base.ntfy, ...(partial.ntfy ?? {}) }
   }
 }
 

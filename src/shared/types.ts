@@ -86,6 +86,9 @@ export interface ChatSettings {
   snipHotkey: string
   talkHotkey: string
   chatAlwaysOnTop: boolean
+  ntfyEnabled: boolean
+  ntfyServer: string
+  ntfyTopic: string
 }
 
 // Result of re-registering global hotkeys after the user changes them: the
@@ -186,4 +189,9 @@ export interface Settings {
   // reopening a project resumes where it left off. See SPEC continuation.
   projectSessions: Record<string, string>
   claudeExecutablePath: string | null
+  // Optional ntfy push notifications when Clorby finishes a long task, errors,
+  // or needs permission while its window is not focused. This is the only
+  // outbound network call beyond the Agent SDK; off by default and entirely
+  // user configured (the user installs ntfy and picks a private topic name).
+  ntfy: { enabled: boolean; server: string; topic: string }
 }

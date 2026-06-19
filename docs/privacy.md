@@ -1,7 +1,8 @@
 # Privacy and security
 
 Clorby is built to stay on your machine. The only thing that leaves it is the
-model request itself, the same as using Claude directly.
+model request itself, the same as using Claude directly. The one exception you
+can switch on is phone notifications (see below); they are off by default.
 
 ## What stays local
 
@@ -10,6 +11,17 @@ model request itself, the same as using Claude directly.
 - Voice out uses your operating system's own speech, locally.
 - Snips are saved as PNGs under your user data folder and read only from there. They are sent only as part of a model request you make, and old ones are cleaned up automatically (default after 7 days).
 - Memory and per-project notes are plain Markdown files on disk.
+
+## Notifications (optional)
+
+Off by default. If you turn on ntfy notifications in Settings, Clorby posts a
+short message to the ntfy server you choose (the public ntfy.sh, or your own
+self-hosted instance) when a long task finishes, hits an error, or needs your
+permission while the chat window is not focused. The message carries a title and
+a brief snippet of the reply, so on the public server that text passes through a
+third party. Two things to keep it private: pick a topic name that is hard to
+guess (anyone who knows it can read your alerts), and self-host ntfy if you would
+rather nothing leave your own network. Nothing is sent while the feature is off.
 
 ## Billing and the subscription
 
