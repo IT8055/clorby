@@ -30,6 +30,19 @@ import type {
 const READ_TOOLS = ['Read', 'Grep', 'Glob']
 const WRITE_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit']
 
+// A stop prefers a graceful interrupt, but a wedged subprocess can leave
+// interrupt() pending forever, so it must never gate the hard abort. Race the
+// interrupt against this, then abort regardless.
+const STOP_INTERRUPT_TIMEOUT_MS = 1500
+
+// If a turn produces no activity at all (no init, no token, no status) for this
+// long, treat the subprocess as wedged: abort it and surface an error rather
+// than leaving the chat stuck busy with a dead Stop button. Generous, so a slow
+// cold resume of a long conversation or an auto-compaction is never killed; any
+// message from the subprocess re-arms it, so a turn that is making progress
+// (streaming text, compacting) never trips it.
+const TURN_IDLE_TIMEOUT_MS = 120_000
+
 // Allow MUST echo the input back as updatedInput, or the tool runs with no
 // arguments and silently does nothing.
 function allow(input: Record<string, unknown>): PermissionResult {
@@ -248,6 +261,10 @@ export interface AgentEvents {
   onError(error: ChatError): void
   onStatus(status: ChatStatus): void
   onToolActivity(activity: ToolActivity): void
+  // Auto-compaction is summarising the conversation to free up context. It can
+  // take a while with no streamed text, so surface it or a big chat looks
+  // frozen. Fired once when a compaction starts.
+  onCompacting(): void
   // Clorby was blocked from a tool it tried to use (confinement, review mode, or
   // Bash off). Drives the brief confused face; not called for a user's Deny.
   onToolDenied(): void
@@ -532,14 +549,19 @@ export class AgentService {
 
   async stop(): Promise<void> {
     this.interrupted = true
-    if (this.current) {
-      try {
-        await this.current.interrupt()
-      } catch {
-        // The stream may already be ending; the abort below is the backstop.
-      }
+    const query = this.current
+    const abort = this.abort
+    if (query) {
+      // Prefer a graceful interrupt so an in-flight tool can settle, but never
+      // block on it: on a wedged subprocess interrupt() can hang forever. Race
+      // it against a short timeout, then fall through to the abort below.
+      const interrupted = query.interrupt().catch(() => undefined)
+      const deadline = new Promise<void>((resolve) => setTimeout(resolve, STOP_INTERRUPT_TIMEOUT_MS))
+      await Promise.race([interrupted, deadline])
     }
-    this.abort?.abort()
+    // The hard stop: aborting the controller terminates the subprocess, so the
+    // turn's loop ends and its finally clears the busy flag. Always reached.
+    abort?.abort()
   }
 
   async send(text: string, attachmentPaths: string[] = []): Promise<void> {
@@ -555,6 +577,37 @@ export class AgentService {
     let firstDelta = true
     let accumulated = ''
     let finalized = false
+
+    // Watchdog: a turn that produces nothing at all for too long is treated as a
+    // wedged subprocess. Arm before the stream and re-arm on every message, so
+    // only a total stall trips it; on a trip, abort so the loop ends and busy
+    // resets. A user stop and a normal finish both clear it.
+    let timedOut = false
+    let watchdog: ReturnType<typeof setTimeout> | null = null
+    const clearWatchdog = (): void => {
+      if (watchdog) {
+        clearTimeout(watchdog)
+        watchdog = null
+      }
+    }
+    const armWatchdog = (): void => {
+      clearWatchdog()
+      watchdog = setTimeout(() => {
+        watchdog = null
+        timedOut = true
+        abort.abort()
+      }, TURN_IDLE_TIMEOUT_MS)
+    }
+    const onTimeout = (): void => {
+      this.events.onError({
+        message: 'Clorby went quiet for too long and gave up waiting. A very long chat can stall; press New chat to start fresh.',
+        detail: null
+      })
+      this.events.onStatus('error')
+    }
+    // True only while a compaction is running, so the notice fires once per
+    // compaction rather than on every status tick.
+    let compacting = false
 
     const options: Options = {
       resume: this.sessionId ?? undefined,
@@ -606,8 +659,11 @@ export class AgentService {
       const sdk = await loadSdk()
       const stream = sdk.query({ prompt: promptInput, options })
       this.current = stream
+      armWatchdog()
 
       for await (const msg of stream) {
+        // Any message is a sign of life: reset the stall timer.
+        armWatchdog()
         if (msg.type === 'system' && msg.subtype === 'init') {
           this.rememberSession(msg.session_id)
           this.model = msg.model
@@ -621,6 +677,13 @@ export class AgentService {
             apiKeySource: source,
             usingApiKey: source !== 'none' && source !== 'oauth'
           })
+        } else if (msg.type === 'system' && msg.subtype === 'status') {
+          // The CLI auto-compacts when context fills. Compaction is a separate
+          // summarising round-trip with no streamed text, so announce it once or
+          // a big chat looks frozen.
+          const isCompacting = msg.status === 'compacting'
+          if (isCompacting && !compacting) this.events.onCompacting()
+          compacting = isCompacting
         } else if (msg.type === 'stream_event') {
           const delta = extractDeltaText(msg.event)
           if (delta !== null) {
@@ -633,18 +696,30 @@ export class AgentService {
           }
         } else if (msg.type === 'result') {
           finalized = true
+          clearWatchdog()
           if (this.interrupted) {
             // A user stop surfaces as an error result; treat it as a clean stop
             // and keep the partial text rather than showing an error.
             this.events.onFinal(accumulated, true)
             this.events.onStatus('idle')
           } else {
+            // input_tokens is only the uncached remainder; the cached prefix is
+            // billed and counted separately, so the true conversation size is
+            // the sum. Prompt caching keeps a warm turn cheap and fast, but the
+            // whole transcript is still replayed every turn and reprocessed cold
+            // once the cache expires, so this is the figure that signals "long".
+            const usage = msg.usage
+            const contextTokens =
+              usage.input_tokens +
+              (usage.cache_read_input_tokens ?? 0) +
+              (usage.cache_creation_input_tokens ?? 0)
             this.events.onResult({
               isError: msg.is_error,
               model: this.model,
               costUsd: msg.total_cost_usd,
-              inputTokens: msg.usage.input_tokens,
-              outputTokens: msg.usage.output_tokens
+              inputTokens: usage.input_tokens,
+              outputTokens: usage.output_tokens,
+              contextTokens
             })
             if (msg.subtype === 'success' && !msg.is_error) {
               this.events.onFinal(accumulated || msg.result, false)
@@ -658,16 +733,23 @@ export class AgentService {
         }
       }
 
-      // Interrupt can also end the stream cleanly without a result message.
-      if (!finalized && this.interrupted) {
-        this.events.onFinal(accumulated, true)
-        this.events.onStatus('idle')
+      // Interrupt or a watchdog abort can also end the stream without a result.
+      if (!finalized) {
+        if (timedOut) {
+          onTimeout()
+        } else if (this.interrupted) {
+          this.events.onFinal(accumulated, true)
+          this.events.onStatus('idle')
+        }
       }
     } catch (err) {
       // Interrupt makes the stream throw after its error result; if the result
-      // branch already finalized the turn, there is nothing more to do.
+      // branch already finalized the turn, there is nothing more to do. A
+      // watchdog trip aborts too, so check timedOut before the abort branch.
       if (!finalized) {
-        if (this.interrupted || abort.signal.aborted) {
+        if (timedOut) {
+          onTimeout()
+        } else if (this.interrupted || abort.signal.aborted) {
           this.events.onFinal(accumulated, true)
           this.events.onStatus('idle')
         } else {
@@ -676,6 +758,7 @@ export class AgentService {
         }
       }
     } finally {
+      clearWatchdog()
       this.busy = false
       this.current = null
       this.abort = null

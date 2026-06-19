@@ -187,6 +187,13 @@ const agent = new AgentService(
         setExpression('working')
       }
     },
+    onCompacting: () => {
+      // Surface auto-compaction as a quiet activity line and the working face,
+      // so a long, silent summarising pause on a big chat reads as work.
+      sendToChat(IPC.chatToolActivity, { kind: 'other', summary: 'Tidying its memory to make room', detail: null })
+      clearExpressionTimer()
+      setExpression('working')
+    },
     onToolDenied: () => flashConfused(),
     onActModeNeeded: (title) => {
       // Offer a one-click switch, once per turn, and give the orb a brief beat.

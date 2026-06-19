@@ -1,5 +1,6 @@
 import { renderMarkdown } from './markdown'
 import { VoiceRecorder, listMicrophones, modelReady } from './speech'
+import { playCue, setSoundsEnabled } from './sounds'
 import type {
   ActModeNeeded,
   ChatError,
@@ -31,13 +32,16 @@ const sendButton = el<HTMLButtonElement>('send')
 const stopButton = el<HTMLButtonElement>('stop')
 const modelLabel = el<HTMLSpanElement>('model')
 const apiKeyLabel = el<HTMLSpanElement>('apikey')
+const tokensLabel = el<HTMLSpanElement>('tokens')
 const snipChips = el<HTMLDivElement>('snipchips')
 const workingBar = el<HTMLDivElement>('workingbar')
+const workingWord = el<HTMLSpanElement>('workingword')
 const historyView = el<HTMLDivElement>('historyview')
 const historyList = el<HTMLDivElement>('historylist')
 const settingsView = el<HTMLDivElement>('settingsview')
 const modelSelect = el<HTMLSelectElement>('modelselect')
 const voiceToggle = el<HTMLInputElement>('voicetoggle')
+const soundToggle = el<HTMLInputElement>('soundtoggle')
 const oledToggle = el<HTMLInputElement>('oledtoggle')
 const voiceSelect = el<HTMLSelectElement>('voiceselect')
 const speedSelect = el<HTMLSelectElement>('speedselect')
@@ -85,6 +89,10 @@ let selectedMic = localStorage.getItem('clorby.mic') ?? ''
 let speechRate = Number(localStorage.getItem('clorby.voice.rate') ?? '1.15')
 let selectedVoiceUri = localStorage.getItem('clorby.voice.uri') ?? ''
 let speakEnabled = localStorage.getItem('clorby.voice') === 'on'
+// Subtle audio cues (turn finished, error, permission asked). On by default;
+// muted via the Settings toggle. Stored in the renderer like the voice setting.
+let soundsEnabled = localStorage.getItem('clorby.sounds') !== 'off'
+setSoundsEnabled(soundsEnabled)
 
 // Attachments queued for the next message: snips and picked files. Each shows
 // as a removable chip; all ride along when the message is sent.
@@ -101,6 +109,101 @@ let bubbleText = ''
 let turnPending: HTMLDivElement | null = null
 
 const TYPING = '<div class="typing"><span></span><span></span><span></span></div>'
+
+// Whimsical status words that cycle in the working bar while a turn runs, so a
+// slow or quiet turn (a cold resume of a long chat, an auto-compaction) visibly
+// keeps moving rather than looking frozen. British spellings; no two in a row.
+const WORKING_WORDS = [
+  'Thinking',
+  'Pondering',
+  'Cogitating',
+  'Ruminating',
+  'Mulling it over',
+  'Noodling',
+  'Percolating',
+  'Whirring',
+  'Cerebrating',
+  'Calculating',
+  'Conjuring',
+  'Puzzling',
+  'Deliberating',
+  'Contemplating',
+  'Musing',
+  'Brewing',
+  'Tinkering',
+  'Marinating',
+  'Wondering',
+  'Daydreaming',
+  'Orbiting the question',
+  'Scheming',
+  'Reckoning',
+  'Combobulating'
+]
+const WORKING_WORD_INTERVAL_MS = 2200
+let workingWordTimer: ReturnType<typeof setInterval> | null = null
+let workingWordIndex = -1
+
+function nextWorkingWord(): void {
+  let i = workingWordIndex
+  // Avoid repeating the same word twice running.
+  while (i === workingWordIndex) i = Math.floor(Math.random() * WORKING_WORDS.length)
+  workingWordIndex = i
+  workingWord.textContent = `${WORKING_WORDS[i]}…`
+}
+
+function startWorkingWords(): void {
+  if (workingWordTimer) return
+  nextWorkingWord()
+  workingWordTimer = setInterval(nextWorkingWord, WORKING_WORD_INTERVAL_MS)
+}
+
+function stopWorkingWords(): void {
+  if (workingWordTimer) {
+    clearInterval(workingWordTimer)
+    workingWordTimer = null
+  }
+}
+
+// Running token totals for this chat, shown in the footer. Reset on a new chat
+// or when a different past chat is opened, so the figure tracks the open chat.
+let sessionInTokens = 0
+let sessionOutTokens = 0
+function formatTokens(n: number): string {
+  if (n < 1000) return String(n)
+  if (n < 100000) return `${(n / 1000).toFixed(1)}k`
+  return `${Math.round(n / 1000)}k`
+}
+function updateTokenLabel(): void {
+  tokensLabel.textContent =
+    sessionInTokens === 0 && sessionOutTokens === 0
+      ? ''
+      : `${formatTokens(sessionInTokens)} in / ${formatTokens(sessionOutTokens)} out`
+}
+function resetSessionTokens(): void {
+  sessionInTokens = 0
+  sessionOutTokens = 0
+  updateTokenLabel()
+}
+
+// Past this much conversation, gently suggest a fresh chat: a long transcript is
+// replayed in full every turn, so replies get slower and pricier (150k matches
+// the model's default auto-compaction trigger). Shown once per chat.
+const NUDGE_CONTEXT_TOKENS = 150000
+let longChatHinted = false
+function showLongChatNudge(): void {
+  const note = document.createElement('div')
+  note.className = 'longchat'
+  const text = document.createElement('div')
+  text.textContent =
+    'This chat is getting long, so replies will be slower and cost more. A new chat is quicker, and Clorby keeps its memory across chats.'
+  const button = document.createElement('button')
+  button.textContent = 'Start a new chat'
+  button.addEventListener('click', () => bridge.newChat())
+  note.appendChild(text)
+  note.appendChild(button)
+  transcript.appendChild(note)
+  scrollToBottom()
+}
 
 // Settings: voice, microphone and model.
 
@@ -146,6 +249,13 @@ voiceToggle.addEventListener('change', () => {
   speakEnabled = voiceToggle.checked
   localStorage.setItem('clorby.voice', speakEnabled ? 'on' : 'off')
   if (!speakEnabled) stopSpeaking()
+})
+soundToggle.addEventListener('change', () => {
+  soundsEnabled = soundToggle.checked
+  localStorage.setItem('clorby.sounds', soundsEnabled ? 'on' : 'off')
+  setSoundsEnabled(soundsEnabled)
+  // Play a cue when turning sounds on, so the change is audible straight away.
+  if (soundsEnabled) playCue('done')
 })
 voiceSelect.addEventListener('change', () => {
   selectedVoiceUri = voiceSelect.value
@@ -259,6 +369,7 @@ el<HTMLButtonElement>('projectexit').addEventListener('click', () => bridge.clea
 
 window.speechSynthesis.addEventListener('voiceschanged', populateVoices)
 voiceToggle.checked = speakEnabled
+soundToggle.checked = soundsEnabled
 populateVoices()
 void populateMics()
 
@@ -335,6 +446,8 @@ function setComposerBusy(busy: boolean): void {
   sendButton.style.display = busy ? 'none' : ''
   stopButton.style.display = busy ? '' : 'none'
   workingBar.classList.toggle('show', busy)
+  if (busy) startWorkingWords()
+  else stopWorkingWords()
   input.placeholder = busy ? 'Type your next message; it sends when Clorby is done' : 'Message Clorby'
   input.focus()
 }
@@ -491,6 +604,7 @@ bridge.onToolActivity((activity: ToolActivity) => {
 
 bridge.onPermissionRequest((request: PermissionRequest) => {
   clearPending()
+  playCue('ask')
   finalizeBubble()
   const card = document.createElement('div')
   card.className = 'permcard'
@@ -534,11 +648,20 @@ bridge.onResult((result: ChatResult) => {
   meta.className = 'meta'
   meta.textContent = `${result.model} · ${result.inputTokens} in / ${result.outputTokens} out`
   transcript.appendChild(meta)
+  sessionInTokens += result.inputTokens
+  sessionOutTokens += result.outputTokens
+  updateTokenLabel()
+  if (!longChatHinted && result.contextTokens >= NUDGE_CONTEXT_TOKENS) {
+    longChatHinted = true
+    showLongChatNudge()
+  }
   scrollToBottom()
 })
 
 bridge.onFinal((final: ChatFinal) => {
   clearPending()
+  // A soft chime when Clorby finishes thinking; a user stop stays silent.
+  if (!final.stopped) playCue('done')
   if (!final.stopped && final.text.length > 0) {
     ensureBubble()
     if (currentBubble) {
@@ -560,6 +683,7 @@ bridge.onFinal((final: ChatFinal) => {
 
 bridge.onError((error: ChatError) => {
   clearPending()
+  playCue('error')
   finalizeBubble()
   const msg = addMessage('assistant')
   msg.className = 'msg assistant error'
@@ -597,6 +721,8 @@ bridge.onSessionCleared(() => {
   turnPending = null
   clearSnipChip()
   clearQueued()
+  resetSessionTokens()
+  longChatHinted = false
   setComposerBusy(false)
 })
 
@@ -821,6 +947,8 @@ bridge.onHistoryLoaded((loaded: HistoryLoaded) => {
   turnPending = null
   clearSnipChip()
   clearQueued()
+  resetSessionTokens()
+  longChatHinted = false
   setComposerBusy(false)
   scrollToBottom()
 })

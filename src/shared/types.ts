@@ -60,6 +60,11 @@ export interface ChatResult {
   costUsd: number
   inputTokens: number
   outputTokens: number
+  // Total size of the conversation sent to the model this turn, including the
+  // cached portion (uncached input plus cache reads and writes). Unlike
+  // inputTokens, which is only the uncached remainder, this reflects how large
+  // the chat has actually grown, so the panel can nudge towards a new chat.
+  contextTokens: number
 }
 
 export interface ChatError {

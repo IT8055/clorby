@@ -190,6 +190,28 @@
         font-size: 11px;
         color: #aaa28b;
       }
+      .longchat {
+        align-self: center;
+        max-width: 92%;
+        margin: 4px 0;
+        text-align: center;
+        font-size: 12px;
+        color: #9a937e;
+        line-height: 1.5;
+      }
+      .longchat button {
+        margin-top: 6px;
+        border: none;
+        border-radius: 6px;
+        background: #e0d8bf;
+        color: #5c5647;
+        padding: 5px 12px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .longchat button:hover {
+        background: #d6cdae;
+      }
       .typing span {
         display: inline-block;
         width: 5px;
@@ -524,8 +546,8 @@
       .membody textarea {
         box-sizing: border-box;
         width: 100%;
-        min-height: 90px;
-        max-height: 200px;
+        min-height: 180px;
+        max-height: 440px;
         resize: vertical;
         padding: 8px 10px;
         border: 1px solid #ddd3b4;
@@ -783,7 +805,14 @@
         border-top: 1px solid #ece3c9;
         display: flex;
         justify-content: space-between;
+        gap: 8px;
         user-select: none;
+      }
+      .footer #tokens {
+        flex: 0 1 auto;
+        text-align: center;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
       }
       /* Dark theme: overrides applied when the document carries */
       /* data-theme="dark". The light rules above are left untouched. */
@@ -893,6 +922,13 @@
       :root[data-theme='dark'] .actcard .adesc,
       :root[data-theme='dark'] .actcard .aoutcome {
         color: #b8d29a;
+      }
+      :root[data-theme='dark'] .longchat {
+        color: #a59f8c;
+      }
+      :root[data-theme='dark'] .longchat button {
+        background: #3a362d;
+        color: #ece6d6;
       }
       .hkrow {
         display: flex;
@@ -1032,7 +1068,7 @@
     </div>
     <div class="workingbar" id="workingbar">
       <span class="workingdot"></span>
-      <span>Clorby is working...</span>
+      <span id="workingword">Thinking…</span>
     </div>
     <div class="queuedbar" id="queuedbar">
       <span class="queuedlabel" id="queuedtext"></span>
@@ -1054,6 +1090,7 @@
     </div>
     <div class="footer">
       <span id="model"></span>
+      <span id="tokens" title="Tokens used this chat (sent / received)"></span>
       <span id="apikey"></span>
     </div>
 
@@ -1117,6 +1154,10 @@
         <div class="field row">
           <span class="label">Read replies aloud</span>
           <input type="checkbox" id="voicetoggle" />
+        </div>
+        <div class="field row">
+          <span class="label">Play sounds (chime when Clorby finishes, and on errors)</span>
+          <input type="checkbox" id="soundtoggle" />
         </div>
         <div class="field">
           <span class="label">Voice</span>
