@@ -5,7 +5,14 @@ import { AgentService } from './agent'
 import { CursorPoller } from './cursor'
 import { registerShortcuts, unregisterShortcuts } from './shortcuts'
 import type { ShortcutHandlers } from './shortcuts'
-import { clampOrbPosition, clampOrbSize, loadSettings, saveOrbPosition, updateSettings } from './settings'
+import {
+  clampOrbPosition,
+  clampOrbSize,
+  loadSettings,
+  orbWindowSize,
+  saveOrbPosition,
+  updateSettings
+} from './settings'
 import { sendNotification } from './notify'
 import { ensureMemoryFile, memoryPath, readMemory, setMemoryProject, writeMemory } from './memory'
 import { formatTranscriptMarkdown, projectChatPath, readProjectChat, writeTextFile } from './transcript'
@@ -77,13 +84,16 @@ let driftTimer: ReturnType<typeof setInterval> | null = null
 // the full orbit, and the centre is clamped so the wander never leaves the area.
 function driftGeometry(home: Point, size: number): { amp: number; centre: Point } {
   const area = screen.getDisplayNearestPoint(home).workArea
-  const desired = Math.round(size * 0.55)
-  const fitX = Math.max(0, Math.floor((area.width - size) / 2))
-  const fitY = Math.max(0, Math.floor((area.height - size) / 2))
+  // Positions and amplitudes are in device-independent pixels, so work from the
+  // orb's DIP window dimension on this display, not its constant on-screen size.
+  const win = orbWindowSize(size, home)
+  const desired = Math.round(win * 0.55)
+  const fitX = Math.max(0, Math.floor((area.width - win) / 2))
+  const fitY = Math.max(0, Math.floor((area.height - win) / 2))
   const amp = Math.max(0, Math.min(desired, fitX, fitY))
   const centre = {
-    x: Math.round(Math.min(Math.max(home.x, area.x + amp), area.x + area.width - amp - size)),
-    y: Math.round(Math.min(Math.max(home.y, area.y + amp), area.y + area.height - amp - size))
+    x: Math.round(Math.min(Math.max(home.x, area.x + amp), area.x + area.width - amp - win)),
+    y: Math.round(Math.min(Math.max(home.y, area.y + amp), area.y + area.height - amp - win))
   }
   return { amp, centre }
 }
@@ -532,14 +542,17 @@ function setOrbSize(size: number): void {
     // Recover the home centre by removing any current drift offset.
     const homeCx = b.x - driftOffset.x + b.width / 2
     const homeCy = b.y - driftOffset.y + b.height / 2
-    const pos = clampOrbPosition(Math.round(homeCx - size / 2), Math.round(homeCy - size / 2), size)
+    // The on-screen size maps to a smaller device-independent window on a scaled
+    // display; centre the new window using that DIP dimension.
+    const win = orbWindowSize(size, { x: Math.round(homeCx), y: Math.round(homeCy) })
+    const pos = clampOrbPosition(Math.round(homeCx - win / 2), Math.round(homeCy - win / 2), size)
     if (oledSafe) {
       const geo = driftGeometry(pos, size)
       driftCentre = geo.centre
       driftAmp = geo.amp
-      orb.setBounds({ x: geo.centre.x + driftOffset.x, y: geo.centre.y + driftOffset.y, width: size, height: size })
+      orb.setBounds({ x: geo.centre.x + driftOffset.x, y: geo.centre.y + driftOffset.y, width: win, height: win })
     } else {
-      orb.setBounds({ x: pos.x, y: pos.y, width: size, height: size })
+      orb.setBounds({ x: pos.x, y: pos.y, width: win, height: win })
     }
     if (orbSizePersistTimer) clearTimeout(orbSizePersistTimer)
     orbSizePersistTimer = setTimeout(() => {
@@ -552,6 +565,20 @@ function setOrbSize(size: number): void {
     updateSettings({ orbSize: size })
     pushChatSettings()
   }
+}
+
+// After the orb moves between displays, re-apply its window dimension so a
+// monitor with a different scale factor keeps it the same on-screen size. The
+// current visual centre (drift included) is held fixed; a no-op if unchanged.
+function refreshOrbWindowSize(): void {
+  const orb = getOrbWindow()
+  if (!orb || orb.isDestroyed()) return
+  const b = orb.getBounds()
+  const cx = b.x + b.width / 2
+  const cy = b.y + b.height / 2
+  const win = orbWindowSize(loadSettings().orbSize, { x: Math.round(cx), y: Math.round(cy) })
+  if (win === b.width) return
+  orb.setBounds({ x: Math.round(cx - win / 2), y: Math.round(cy - win / 2), width: win, height: win })
 }
 
 function setTheme(theme: Theme): void {
@@ -751,6 +778,9 @@ function wireIpc(): void {
     } else {
       const orb = getOrbWindow()
       if (orb && !orb.isDestroyed()) {
+        // The orb may have crossed onto a display with a different scale factor;
+        // re-apply its window dimension to hold the on-screen size before saving.
+        refreshOrbWindowSize()
         const b = orb.getBounds()
         // Save the base position, undoing any OLED drift offset.
         const baseX = b.x - driftOffset.x

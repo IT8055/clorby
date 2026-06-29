@@ -17,6 +17,17 @@ export function clampOrbSize(size: number): number {
   return Math.round(Math.min(Math.max(size, ORB_SIZE_MIN), ORB_SIZE_MAX))
 }
 
+// orbSize is the intended on-screen size in physical pixels, kept constant
+// across monitors. A BrowserWindow is sized in device-independent pixels, which
+// Windows multiplies by the display's scale factor to get physical pixels, so
+// dividing by that factor keeps the orb the same on-screen size on every
+// monitor regardless of its scale (100, 125, 150 percent, etc). point selects
+// which display's scale to use.
+export function orbWindowSize(size: number, point: { x: number; y: number }): number {
+  const scale = screen.getDisplayNearestPoint(point).scaleFactor || 1
+  return Math.max(1, Math.round(size / scale))
+}
+
 let cache: Settings | null = null
 
 function settingsFile(): string {
@@ -25,9 +36,10 @@ function settingsFile(): string {
 
 function defaultOrbPosition(): { x: number; y: number } {
   const area = screen.getPrimaryDisplay().workArea
+  const win = orbWindowSize(DEFAULT_ORB_SIZE, { x: area.x, y: area.y })
   return {
-    x: area.x + area.width - DEFAULT_ORB_SIZE - DEFAULT_MARGIN,
-    y: area.y + area.height - DEFAULT_ORB_SIZE - DEFAULT_MARGIN
+    x: area.x + area.width - win - DEFAULT_MARGIN,
+    y: area.y + area.height - win - DEFAULT_MARGIN
   }
 }
 
@@ -119,8 +131,11 @@ export function clampOrbPosition(
   size: number = DEFAULT_ORB_SIZE
 ): { x: number; y: number } {
   const area = screen.getDisplayNearestPoint({ x, y }).workArea
-  const maxX = area.x + area.width - size
-  const maxY = area.y + area.height - size
+  // Clamp against the orb's device-independent window dimension on this display,
+  // not its constant on-screen size, since positions are in DIP too.
+  const win = orbWindowSize(size, { x, y })
+  const maxX = area.x + area.width - win
+  const maxY = area.y + area.height - win
   return {
     x: Math.max(area.x, Math.min(x, maxX)),
     y: Math.max(area.y, Math.min(y, maxY))
