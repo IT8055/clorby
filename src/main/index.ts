@@ -50,6 +50,13 @@ let holdTimer: ReturnType<typeof setTimeout> | null = null
 let recording = false
 
 let orbVisible = true
+
+// The orb's intended on-screen size (physical px), held separately from the
+// persisted setting so the snap-back below has a synchronous source of truth
+// even while a slider drag debounces the write. snappingOrb guards our own
+// setBounds from recursing through the resize event it fires.
+let intendedOrbSize = 0
+let snappingOrb = false
 let isQuitting = false
 
 // Captured snips and picked files waiting to ride along with the next message.
@@ -536,6 +543,7 @@ function setOledSafe(enabled: boolean): void {
 let orbSizePersistTimer: ReturnType<typeof setTimeout> | null = null
 function setOrbSize(size: number): void {
   size = clampOrbSize(size)
+  intendedOrbSize = size
   const orb = getOrbWindow()
   if (orb && !orb.isDestroyed()) {
     const b = orb.getBounds()
@@ -546,6 +554,8 @@ function setOrbSize(size: number): void {
     // display; centre the new window using that DIP dimension.
     const win = orbWindowSize(size, { x: Math.round(homeCx), y: Math.round(homeCy) })
     const pos = clampOrbPosition(Math.round(homeCx - win / 2), Math.round(homeCy - win / 2), size)
+    // This is a deliberate resize, so suppress the snap-back it would trigger.
+    snappingOrb = true
     if (oledSafe) {
       const geo = driftGeometry(pos, size)
       driftCentre = geo.centre
@@ -554,6 +564,7 @@ function setOrbSize(size: number): void {
     } else {
       orb.setBounds({ x: pos.x, y: pos.y, width: win, height: win })
     }
+    snappingOrb = false
     if (orbSizePersistTimer) clearTimeout(orbSizePersistTimer)
     orbSizePersistTimer = setTimeout(() => {
       orbSizePersistTimer = null
@@ -567,18 +578,27 @@ function setOrbSize(size: number): void {
   }
 }
 
-// After the orb moves between displays, re-apply its window dimension so a
-// monitor with a different scale factor keeps it the same on-screen size. The
-// current visual centre (drift included) is held fixed; a no-op if unchanged.
-function refreshOrbWindowSize(): void {
+// The orb window's size is owned entirely by us. Electron rescales a frameless
+// transparent window whenever Windows hands it a different DPI (for example
+// moving between monitors of different scale), and on Windows this is cumulative
+// and can skew the window non-square, so the orb slowly grows into an ellipse.
+// Snap it straight back to the scale-corrected square for whichever display its
+// centre is on, holding the visual centre (drift included) fixed. Wired to the
+// window's resize event so it catches every uninvited rescale, and called after
+// a drag where the scale may have changed without a resize event. The guard
+// stops our own setBounds from recursing through the resize it triggers.
+function snapOrbSize(): void {
+  if (snappingOrb) return
   const orb = getOrbWindow()
   if (!orb || orb.isDestroyed()) return
   const b = orb.getBounds()
   const cx = b.x + b.width / 2
   const cy = b.y + b.height / 2
-  const win = orbWindowSize(loadSettings().orbSize, { x: Math.round(cx), y: Math.round(cy) })
-  if (win === b.width) return
+  const win = orbWindowSize(intendedOrbSize, { x: Math.round(cx), y: Math.round(cy) })
+  if (b.width === win && b.height === win) return
+  snappingOrb = true
   orb.setBounds({ x: Math.round(cx - win / 2), y: Math.round(cy - win / 2), width: win, height: win })
+  snappingOrb = false
 }
 
 function setTheme(theme: Theme): void {
@@ -780,7 +800,7 @@ function wireIpc(): void {
       if (orb && !orb.isDestroyed()) {
         // The orb may have crossed onto a display with a different scale factor;
         // re-apply its window dimension to hold the on-screen size before saving.
-        refreshOrbWindowSize()
+        snapOrbSize()
         const b = orb.getBounds()
         // Save the base position, undoing any OLED drift offset.
         const baseX = b.x - driftOffset.x
@@ -960,6 +980,7 @@ function wireIpc(): void {
 
 function start(): void {
   const settings = loadSettings()
+  intendedOrbSize = settings.orbSize
   cleanupOldSnips(settings.snip.retentionDays)
   ensureMemoryFile()
   watchMemoryFile()
@@ -973,7 +994,10 @@ function start(): void {
   })
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === 'media')
 
-  createOrbWindow(settings)
+  const orb = createOrbWindow(settings)
+  // Windows can rescale a transparent frameless window on a DPI change; snap it
+  // back so the orb can never creep larger or distort.
+  orb.on('resize', snapOrbSize)
   const chat = createChatWindow(settings.chatAlwaysOnTop)
   chat.webContents.on('did-finish-load', () => {
     const s = loadSettings()
